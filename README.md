@@ -1,64 +1,53 @@
-# F1 Telemetry Dashboard (F1 25 - PS5 / Windows PoC & Web Dashboard)
+﻿# 🏎️ F1 25 Cockpit Telemetry Dashboard
 
-Proof of Concept (PoC) para recepção, decodificação e visualização em tempo real da telemetria UDP enviada pelo **F1 25 no PlayStation 5** (ou simulador local), com suporte a **60Hz** e **Dashboard Web no Navegador**.
+Projeto dividido em duas frentes completas:
+
+`	ext
+F1 Dash/
+├── web-server/     # Servidor Node.js de UDP + WebSocket + Preview Web (Vite)
+└── mobile-app/     # Aplicativo React Native (Expo) com Cockpit Display
+`
 
 ---
 
-## 🏎️ Como Executar
+## 1. 🌐 Web Server & Simulador de Testes (web-server/)
 
-### 1. Iniciar o Receptor UDP + Servidor Web
+Ideal para receber os dados do PS5/PC e inspecionar a telemetria no navegador.
 
-```powershell
+### Como rodar:
+`ash
+cd web-server
+npm install
 npm run dev
-```
+`
+* **Dashboard Web**: http://localhost:5173 ou http://IP_DO_PC:5173
+* **Socket UDP**: Escutando na porta 20777
 
-O receptor iniciará na porta UDP `20777` e abrirá o servidor Web na porta `3000`.
-
----
-
-### 2. Acessar o Dashboard Visual no Navegador
-
-Abra no seu navegador (Google Chrome, Edge, Firefox, celular ou tablet no mesmo Wi-Fi):
-
-* No computador: **[http://localhost:3000](http://localhost:3000)**
-* No celular ou tablet (conectado no mesmo Wi-Fi): **`http://<IP_DO_PC>:3000`** *(o IP exato aparece no terminal ao iniciar)*
-
----
-
-### 3. Teste 1: Usando o Simulador Mock Local (60Hz)
-
-Abra um **segundo terminal** na mesma pasta e execute:
-
-```powershell
+### Testar sem o videogame ligado (Mock Simulator):
+Em um segundo terminal dentro de web-server:
+`ash
 npm run mock
-```
-
-O simulador enviará pacotes a **60Hz**. No navegador, você verá o painel estilo volante de F1 atualizando instantaneamente com:
-- LEDs de troca de marcha (Shift Lights)
-- Velocímetro e indicador gigante de marcha
-- Acelerador e freio com animação ultra fluida
-- Status de DRS
-- Temperaturas e pressões dos 4 pneus (FL, FR, RL, RR) e freios
+`
 
 ---
 
-### 4. Teste 2: Conectando com o F1 25 Real no PS5 (60Hz)
+## 2. 📱 App Mobile React Native (mobile-app/)
 
-1. Certifique-se de que o **PC e o PS5 estão na mesma rede local**.
-2. Inicie `npm run dev` no PC e abra `http://localhost:3000`.
-3. No **PS5**, dentro do **F1 25**:
-   - Vá em **Opções de Jogo / Configurações** > **Configurações de Telemetria**.
-   - **Telemetria UDP**: `Ligado` (On).
-   - **Formato UDP**: `2024` ou `2025`.
-   - **Endereço IP UDP**: Insira o IP do seu PC mostrado no terminal.
-   - **Porta UDP**: `20777`.
-   - **Frequência de envio de telemetria**: `60Hz`.
-4. Entre na pista e pilote! O dashboard web no navegador exibirá os dados em tempo real a 60 FPS com latência mínima.
+Aplicativo nativo para smartphone Android/iOS com layout Landscape (celular deitado), contendo:
+- **Modo Realista (Cockpit)** e **Modo Moderno** (com contagiros curvo).
+- LEDs de RPM / RevLights (15 LEDs de troca de marcha).
+- Marcha gigante, velocidade em km/h e badges dinâmicos de DRS e Overtake.
+- Cronômetro de voltas, setores, posições (P1..P24) e deltas.
+- Indicador térmico de 4 pneus (temperaturas, pressões em PSI, desgaste e compostos).
+- Painel de alerta com faixas animadas para **Safety Car (SC)**, **VSC**, **Bandeira Vermelha** e **Pit Lane**.
+- **Mapa Térmico de Danos do Carro (Damage Heatmap)** em SVG.
+- Simulador interno embutido com seletor de cenários para testes imediatos no celular.
 
----
-
-## 🧪 Testes Automatizados
-
-```powershell
-npm test
-```
+### Como rodar no celular com Expo:
+`ash
+cd mobile-app
+npm install
+npx expo start
+`
+* Abra o app **Expo Go** no seu celular Android e leia o QR Code gerado no terminal.
+* Você terá **Fast Refresh e Hot Reloading** em tempo real a cada alteração de design!
