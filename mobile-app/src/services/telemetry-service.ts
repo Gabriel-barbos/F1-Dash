@@ -1,4 +1,4 @@
-﻿import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
+import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
 import { TelemetryStore } from '../core/state/telemetry-store';
 import { nativeUdpReceiver } from './native-udp-receiver';
 import { ERSDeployMode, VisualTyreCompound } from '../core/models/car-status';
@@ -19,11 +19,16 @@ class TelemetryService {
   private storeUnsub: (() => void) | null = null;
 
   constructor() {
-    // Escuta o TelemetryStore interno (utilizado quando os pacotes UDP chegam diretamente no celular)
     const store = TelemetryStore.getInstance();
     this.storeUnsub = store.subscribe((storeState) => {
       if (this.mode === 'UDP_NATIVE' && storeState.connected) {
-        this.currentState = { ...storeState };
+        this.currentState = {
+          ...storeState,
+          floorDamage: storeState.floorDamage ?? 0,
+          diffuserDamage: storeState.diffuserDamage ?? 0,
+          sidepodDamage: storeState.sidepodDamage ?? 0,
+          gearBoxDamage: storeState.gearBoxDamage ?? 0
+        };
         this.notify();
       }
     });
@@ -67,7 +72,7 @@ class TelemetryService {
   public async startNativeUdp() {
     const started = await nativeUdpReceiver.start();
     if (!started) {
-      console.log('[TelemetryService] UDP nativo não disponível no ambiente atual, ativando fallback.');
+      console.log('[TelemetryService] UDP nativo não disponível no ambiente atual.');
     }
   }
 
@@ -86,7 +91,7 @@ class TelemetryService {
     this.disconnectWs();
 
     try {
-      const url = ws:///telemetry-ws;
+      const url = `ws://${this.serverHost}/telemetry-ws`;
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
@@ -212,6 +217,9 @@ class TelemetryService {
         frontLeftWingDamage: (tick % 500 > 350) ? 25 : 0,
         frontRightWingDamage: 0,
         floorDamage: (tick % 500 > 350) ? 15 : 0,
+        diffuserDamage: 0,
+        sidepodDamage: 0,
+        gearBoxDamage: 0,
         rearWingDamage: 0,
         engineDamage: 4
       };
@@ -232,7 +240,7 @@ class TelemetryService {
       case 'SAFETY_CAR':
         this.currentState = {
           ...this.currentState,
-          safetyCarStatus: SafetyCarStatus.FullSafetyCar,
+          safetyCarStatus: SafetyCarStatus.Full,
           safetyCarDelta: 12.543,
           isRedFlagActive: false,
           pitStatus: PitStatus.None
@@ -241,7 +249,7 @@ class TelemetryService {
       case 'VSC':
         this.currentState = {
           ...this.currentState,
-          safetyCarStatus: SafetyCarStatus.VirtualSafetyCar,
+          safetyCarStatus: SafetyCarStatus.Virtual,
           safetyCarDelta: -0.421,
           isRedFlagActive: false,
           pitStatus: PitStatus.None
@@ -251,19 +259,19 @@ class TelemetryService {
         this.currentState = {
           ...this.currentState,
           isRedFlagActive: true,
-          safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+          safetyCarStatus: SafetyCarStatus.None,
           pitStatus: PitStatus.None
         };
         break;
       case 'PIT_LANE':
         this.currentState = {
           ...this.currentState,
-          pitStatus: PitStatus.PitLane,
+          pitStatus: PitStatus.InPitArea,
           pitLimiterActive: true,
           pitSpeedLimit: 80,
           speed: 78,
           gear: 2,
-          safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+          safetyCarStatus: SafetyCarStatus.None,
           isRedFlagActive: false
         };
         break;
@@ -272,7 +280,7 @@ class TelemetryService {
           ...this.currentState,
           ersDeployMode: ERSDeployMode.Overtake,
           drsActive: false,
-          safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+          safetyCarStatus: SafetyCarStatus.None,
           isRedFlagActive: false
         };
         break;
@@ -282,7 +290,7 @@ class TelemetryService {
           drsActive: true,
           drsAllowed: true,
           ersDeployMode: ERSDeployMode.Medium,
-          safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+          safetyCarStatus: SafetyCarStatus.None,
           isRedFlagActive: false
         };
         break;
@@ -300,7 +308,7 @@ class TelemetryService {
       default:
         this.currentState = {
           ...this.currentState,
-          safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+          safetyCarStatus: SafetyCarStatus.None,
           isRedFlagActive: false,
           pitStatus: PitStatus.None,
           drsActive: false,

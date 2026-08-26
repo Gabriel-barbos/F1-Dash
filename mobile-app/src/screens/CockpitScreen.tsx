@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,12 +32,10 @@ export const CockpitScreen: React.FC = () => {
   const [connMode, setConnMode] = useState<ConnectionMode>('UDP_NATIVE');
 
   useEffect(() => {
-    // Inscrever-se no serviço de telemetria
     const unsubscribe = telemetryService.subscribe((state) => {
       setTelemetry({ ...state });
     });
 
-    // Iniciar escuta UDP direta
     telemetryService.setMode('UDP_NATIVE');
 
     return () => {
@@ -56,13 +54,13 @@ export const CockpitScreen: React.FC = () => {
   };
 
   const isSafetyCar =
-    telemetry.safetyCarStatus === SafetyCarStatus.FullSafetyCar ||
-    telemetry.safetyCarStatus === SafetyCarStatus.VirtualSafetyCar;
+    telemetry.safetyCarStatus === SafetyCarStatus.Full ||
+    telemetry.safetyCarStatus === SafetyCarStatus.Virtual;
 
   const isRedFlag = telemetry.isRedFlagActive;
 
   const isPitLane =
-    telemetry.pitStatus === PitStatus.PitLane ||
+    telemetry.pitStatus === PitStatus.InPitArea ||
     telemetry.pitStatus === PitStatus.Pitting ||
     telemetry.pitLimiterActive;
 
@@ -76,7 +74,6 @@ export const CockpitScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden />
       <View style={styles.container}>
-        {/* BARRA SUPERIOR DE STATUS E CONTROLES */}
         <View style={styles.topBar}>
           <View style={styles.statusGroup}>
             <View
@@ -90,15 +87,14 @@ export const CockpitScreen: React.FC = () => {
                 ? connMode === 'MOCK'
                   ? 'SIMULADOR DE TESTE ATIVO (60 FPS)'
                   : connMode === 'UDP_NATIVE'
-                  ? UDP 20777 ATIVO (F1 )
-                  : WEBSOCKET CONECTADO (F1 )
+                  ? `UDP 20777 ATIVO (F1 ${telemetry.gameYear ?? 2025})`
+                  : `WEBSOCKET CONECTADO (F1 ${telemetry.gameYear ?? 2025})`
                 : connMode === 'UDP_NATIVE'
                 ? 'ESCUTANDO UDP 20777 (AGUARDANDO DADOS DO JOGO)...'
                 : 'AGUARDANDO CONEXÃO COM SERVIDOR...'}
             </Text>
           </View>
 
-          {/* Botões de Configuração e Modo */}
           <View style={styles.actionsGroup}>
             <TouchableOpacity onPress={cycleConnectionMode} style={styles.connToggleBtn}>
               <Text style={styles.connToggleText}>
@@ -126,7 +122,6 @@ export const CockpitScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* BARRA DE TESTES RÁPIDOS DE CENÁRIO (Disponível quando no modo MOCK) */}
         {connMode === 'MOCK' && (
           <View style={styles.scenarioBar}>
             <Text style={styles.scenarioLabel}>CENÁRIO:</Text>
@@ -159,29 +154,23 @@ export const CockpitScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ÁREA PRINCIPAL DO DASHBOARD */}
         <View style={styles.dashboardBody}>
-          {/* ESTADO ESPECIAL: BANDEIRA VERMELHA */}
           {isRedFlag ? (
             <RedFlagBanner />
           ) : isSafetyCar ? (
-            /* ESTADO ESPECIAL: SAFETY CAR / VSC */
             <SafetyCarBanner
               status={telemetry.safetyCarStatus}
               delta={telemetry.safetyCarDelta ?? 0}
               speedLimit={80}
             />
           ) : isPitLane ? (
-            /* ESTADO ESPECIAL: PIT LANE */
             <PitLaneBanner
               speedLimit={telemetry.pitSpeedLimit ?? 80}
               currentSpeed={telemetry.speed ?? 0}
               timeInLaneMS={telemetry.pitLaneTimeInLaneInMS ?? 0}
             />
           ) : (
-            /* ESTADO PADRÃO DE CORRIDA */
             <View style={styles.racingLayout}>
-              {/* REV LIGHTS NO TOPO */}
               <View style={styles.revLightsArea}>
                 {uiMode === 'REALISTIC' ? (
                   <RevLights revPercent={telemetry.revLightsPercent ?? 0} />
@@ -194,9 +183,7 @@ export const CockpitScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* CONTEÚDO PRINCIPAL EM 3 COLUNAS */}
               <View style={styles.columnsContainer}>
-                {/* COLUNA ESQUERDA: TEMPOS, BATERIA E PNEUS */}
                 <View style={styles.leftColumn}>
                   <TimingWidget
                     position={telemetry.carPosition ?? 5}
@@ -213,7 +200,6 @@ export const CockpitScreen: React.FC = () => {
                   />
                 </View>
 
-                {/* COLUNA CENTRAL: MARCHA E VELOCIDADE */}
                 <View style={styles.centerColumn}>
                   <GearDisplay
                     gear={telemetry.gear ?? 0}
@@ -225,7 +211,6 @@ export const CockpitScreen: React.FC = () => {
                   />
                 </View>
 
-                {/* COLUNA DIREITA: PNEUS E PEDAIS */}
                 <View style={styles.rightColumn}>
                   <TyreWidget
                     compound={telemetry.visualTyreCompound ?? 18}
@@ -244,7 +229,6 @@ export const CockpitScreen: React.FC = () => {
           )}
         </View>
 
-        {/* MODAL DE MAPA TÉRMICO DE DANOS */}
         <DamageHeatmap
           visible={damageModalVisible}
           onClose={() => setDamageModalVisible(false)}

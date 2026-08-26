@@ -86,6 +86,10 @@ export interface CockpitTelemetryState {
   frontLeftWingDamage: number;
   frontRightWingDamage: number;
   rearWingDamage: number;
+  floorDamage: number;
+  diffuserDamage: number;
+  sidepodDamage: number;
+  gearBoxDamage: number;
   engineDamage: number;
 }
 
@@ -216,6 +220,10 @@ export class TelemetryStore {
       this.state.frontLeftWingDamage = damage.frontLeftWingDamage;
       this.state.frontRightWingDamage = damage.frontRightWingDamage;
       this.state.rearWingDamage = damage.rearWingDamage;
+      this.state.floorDamage = damage.floorDamage;
+      this.state.diffuserDamage = damage.diffuserDamage;
+      this.state.sidepodDamage = damage.sidepodDamage;
+      this.state.gearBoxDamage = damage.gearBoxDamage;
       this.state.engineDamage = damage.engineDamage;
     }
 
@@ -315,6 +323,10 @@ export class TelemetryStore {
       frontLeftWingDamage: 0,
       frontRightWingDamage: 0,
       rearWingDamage: 0,
+      floorDamage: 0,
+      diffuserDamage: 0,
+      sidepodDamage: 0,
+      gearBoxDamage: 0,
       engineDamage: 0
     };
   }

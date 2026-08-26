@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface TimingWidgetProps {
@@ -23,12 +23,11 @@ export const TimingWidget: React.FC<TimingWidgetProps> = ({
     const mins = Math.floor(ms / 60000);
     const secs = Math.floor((ms % 60000) / 1000);
     const millis = Math.floor(ms % 1000);
-    return ${mins}:.;
+    return `${mins}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
   };
 
   return (
     <View style={styles.container}>
-      {/* Posição e Volta */}
       <View style={styles.topRow}>
         <View style={styles.posBadge}>
           <Text style={styles.posText}>P{position || '-'}</Text>
@@ -39,13 +38,11 @@ export const TimingWidget: React.FC<TimingWidgetProps> = ({
         </View>
       </View>
 
-      {/* Cronômetro da Volta Atual */}
       <View style={styles.timeBox}>
         <Text style={styles.timeLabel}>CURRENT</Text>
         <Text style={styles.timeValue}>{formatTime(currentLapTimeMS)}</Text>
       </View>
 
-      {/* Última Volta / Delta */}
       <View style={styles.bottomRow}>
         <View>
           <Text style={styles.subLabel}>LAST LAP</Text>
@@ -55,7 +52,7 @@ export const TimingWidget: React.FC<TimingWidgetProps> = ({
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={styles.subLabel}>DELTA</Text>
             <Text style={[styles.subValue, { color: deltaFrontMS > 0 ? '#ef4444' : '#22c55e' }]}>
-              {deltaFrontMS > 0 ? +s : ${(deltaFrontMS / 1000).toFixed(3)}s}
+              {deltaFrontMS > 0 ? `+${(deltaFrontMS / 1000).toFixed(3)}s` : `${(deltaFrontMS / 1000).toFixed(3)}s`}
             </Text>
           </View>
         )}

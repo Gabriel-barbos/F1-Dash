@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafetyCarStatus } from '../core/models/session';
 
@@ -13,24 +13,21 @@ export const SafetyCarBanner: React.FC<SafetyCarBannerProps> = ({
   delta,
   speedLimit = 80
 }) => {
-  const isVSC = status === SafetyCarStatus.VirtualSafetyCar;
+  const isVSC = status === SafetyCarStatus.Virtual;
   const title = isVSC ? 'VSC' : 'SAFETY CAR';
   const subtitle = isVSC ? 'VIRTUAL SAFETY CAR' : 'SC';
 
   return (
     <View style={styles.container}>
-      {/* Faixas de alerta no topo */}
       <View style={styles.hazardBar}>
         <Text style={styles.hazardStripes}>/// /// /// /// /// /// /// /// /// /// /// /// /// /// ///</Text>
       </View>
 
       <View style={styles.content}>
-        {/* Título Central */}
         <Text style={styles.titleText}>{title}</Text>
         <Text style={styles.subTitleText}>{subtitle}</Text>
         <Text style={styles.instructionText}>REDUCE PACE • NO OVERTAKING</Text>
 
-        {/* Informações de Velocidade e Delta */}
         <View style={styles.infoRow}>
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>SPEED LIMIT</Text>
@@ -40,13 +37,12 @@ export const SafetyCarBanner: React.FC<SafetyCarBannerProps> = ({
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>DELTA</Text>
             <Text style={[styles.infoValue, { color: delta >= 0 ? '#22c55e' : '#ef4444' }]}>
-              {delta >= 0 ? + : delta.toFixed(3)}
+              {delta >= 0 ? `+${delta.toFixed(3)}` : delta.toFixed(3)}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Faixas de alerta no rodapé */}
       <View style={styles.hazardBar}>
         <Text style={styles.hazardStripes}>/// /// /// /// /// /// /// /// /// /// /// /// /// /// ///</Text>
       </View>
@@ -85,10 +81,7 @@ const styles = StyleSheet.create({
     color: '#facc15',
     fontSize: 34,
     fontWeight: '900',
-    letterSpacing: 2,
-    textShadowColor: 'rgba(250, 204, 21, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10
+    letterSpacing: 2
   },
   subTitleText: {
     color: '#fef08a',

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ERSDeployMode } from '../core/models/car-status';
 
@@ -37,7 +37,7 @@ export const ErsWidget: React.FC<ErsWidgetProps> = ({
           style={[
             styles.barFill,
             {
-              width: ${Math.max(0, Math.min(100, batteryPercent))}%,
+              width: `${Math.max(0, Math.min(100, batteryPercent))}%`,
               backgroundColor: isOvertake ? '#eab308' : '#22c55e'
             }
           ]}

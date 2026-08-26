@@ -1,23 +1,24 @@
-﻿{
-  expo: {
-    name: F1 Cockpit Display,
-    slug: f1-cockpit-display,
-    version: 1.0.0,
-    orientation: landscape,
-    icon: ./assets/icon.png,
-    userInterfaceStyle: dark,
-    splash: {
-      backgroundColor: #09090b
+{
+  "expo": {
+    "name": "F1 Cockpit Display",
+    "slug": "f1-cockpit-display",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#09090b"
     },
-    ios: {
-      supportsTablet: true,
-      requireFullScreen: true
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": true
     },
-    android: {
-      adaptiveIcon: {
-        backgroundColor: #09090b
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#09090b"
       }
     },
-    plugins: []
+    "plugins": [
+      "expo-asset"
+    ]
   }
 }

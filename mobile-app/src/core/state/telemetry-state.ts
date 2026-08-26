@@ -1,4 +1,4 @@
-﻿import { SafetyCarStatus, Weather, SessionType } from '../models/session';
+import { SafetyCarStatus, Weather, SessionType } from '../models/session';
 import { PitStatus, DriverStatus } from '../models/lap-data';
 import { ERSDeployMode, VisualTyreCompound, VehicleFiaFlag } from '../models/car-status';
 
@@ -25,7 +25,7 @@ export interface CockpitTelemetryState {
   drsAllowed: boolean;
   revLightsPercent: number;
   engineTemperature: number;
-  brakesTemperature: [number, number, number, number]; // [RL, RR, FL, FR]
+  brakesTemperature: [number, number, number, number];
   tyresSurfaceTemperature: [number, number, number, number];
   tyresInnerTemperature: [number, number, number, number];
   tyresPressure: [number, number, number, number];
@@ -153,7 +153,7 @@ export const INITIAL_TELEMETRY_STATE: CockpitTelemetryState = {
   pitStopShouldServePen: false,
   numPitStops: 0,
 
-  safetyCarStatus: SafetyCarStatus.NoSafetyCar,
+  safetyCarStatus: SafetyCarStatus.None,
   isRedFlagActive: false,
   weather: Weather.Clear,
   trackTemperature: 32,
