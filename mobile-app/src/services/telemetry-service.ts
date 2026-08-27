@@ -9,13 +9,24 @@ export type TelemetryCallback = (state: CockpitTelemetryState) => void;
 
 export type ConnectionMode = 'UDP_NATIVE' | 'WEBSOCKET' | 'MOCK';
 
+export type MomentaryEventType =
+  | 'RACE_START'
+  | 'SAFETY_CAR'
+  | 'VSC'
+  | 'RED_FLAG'
+  | 'PIT_LANE'
+  | 'CAR_DAMAGE'
+  | 'CHEQUERED_FLAG';
+
 class TelemetryService {
   private ws: WebSocket | null = null;
   private listeners: Set<TelemetryCallback> = new Set();
+  private momentaryListeners: Set<(type: MomentaryEventType) => void> = new Set();
   private currentState: CockpitTelemetryState = { ...INITIAL_TELEMETRY_STATE };
   private mockInterval: any = null;
   private serverHost: string = '192.168.1.104:5173';
   private mode: ConnectionMode = 'UDP_NATIVE';
+  private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
 
   constructor() {
@@ -319,6 +330,44 @@ class TelemetryService {
         break;
     }
     this.notify();
+  }
+
+  public getDeviceName(): string {
+    return this.deviceName;
+  }
+
+  public setDeviceName(name: string) {
+    this.deviceName = name;
+    this.notify();
+  }
+
+  public getServerHost(): string {
+    return this.serverHost;
+  }
+
+  public subscribeMomentaryEvent(callback: (type: MomentaryEventType) => void): () => void {
+    this.momentaryListeners.add(callback);
+    return () => {
+      this.momentaryListeners.delete(callback);
+    };
+  }
+
+  public triggerMomentaryEvent(type: MomentaryEventType) {
+    if (type === 'SAFETY_CAR') {
+      this.forceStateScenario('SAFETY_CAR');
+    } else if (type === 'VSC') {
+      this.forceStateScenario('VSC');
+    } else if (type === 'RED_FLAG') {
+      this.forceStateScenario('RED_FLAG');
+    } else if (type === 'PIT_LANE') {
+      this.forceStateScenario('PIT_LANE');
+    } else if (type === 'CAR_DAMAGE') {
+      this.forceStateScenario('DAMAGE');
+    }
+
+    for (const listener of this.momentaryListeners) {
+      listener(type);
+    }
   }
 }
 

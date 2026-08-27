@@ -13,8 +13,16 @@
       "requireFullScreen": true
     },
     "android": {
+      "package": "com.f1cockpit.app",
       "adaptiveIcon": {
         "backgroundColor": "#09090b"
+      },
+      "navigationBar": {
+        "visible": "sticky-immersive"
+      },
+      "statusBar": {
+        "hidden": true,
+        "translucent": true
       }
     },
     "plugins": [
