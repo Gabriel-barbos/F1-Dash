@@ -27,7 +27,7 @@ interface TimingCardProps {
 }
 
 function formatLapTime(ms: number): string {
-  if (ms <= 0) return '0:00.000';
+  if (!ms || ms <= 0 || ms > 3_600_000 || isNaN(ms)) return '--:--.---';
   const mins = Math.floor(ms / 60_000);
   const secs = Math.floor((ms % 60_000) / 1_000);
   const millis = Math.floor(ms % 1_000);
@@ -46,19 +46,20 @@ export const TimingCard: React.FC<TimingCardProps> = memo(({
   theme,
 }) => {
   const isDeltaNegative = deltaFrontMS <= 0;
-  const deltaFormatted = deltaFrontMS === 0
-    ? '-0.247'
+  const deltaFormatted = (!deltaFrontMS || isNaN(deltaFrontMS))
+    ? '0.000'
     : deltaFrontMS > 0
     ? `+${(deltaFrontMS / 1000).toFixed(3)}`
     : `${(deltaFrontMS / 1000).toFixed(3)}`;
 
   const deltaColor = isDeltaNegative ? '#22c55e' : '#ef4444';
+  const displayPosition = position > 0 && position <= 24 ? `P${position}` : 'P--';
 
   return (
     <View style={[styles.container, { borderColor: theme.cardBorder }]}>
       {/* Linha 1: Posição e Volta */}
       <View style={styles.topRow}>
-        <Text style={styles.positionText}>P{position || 1}</Text>
+        <Text style={styles.positionText}>{displayPosition}</Text>
         <Text style={styles.lapText}>
           LAP {currentLap || 1}/{totalLaps || 56}
         </Text>
@@ -86,14 +87,14 @@ export const TimingCard: React.FC<TimingCardProps> = memo(({
         <View>
           <Text style={styles.sectionLabel}>LAST LAP</Text>
           <Text style={styles.historyLapTime}>
-            {lastLapTimeMS > 0 ? formatLapTime(lastLapTimeMS) : '1:28.456'}
+            {formatLapTime(lastLapTimeMS)}
           </Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.sectionLabel, { color: '#c084fc' }]}>BEST LAP</Text>
           <Text style={[styles.historyLapTime, { color: '#c084fc' }]}>
-            {bestLapTimeMS > 0 ? formatLapTime(bestLapTimeMS) : '1:27.891'}
+            {formatLapTime(bestLapTimeMS)}
           </Text>
         </View>
       </View>

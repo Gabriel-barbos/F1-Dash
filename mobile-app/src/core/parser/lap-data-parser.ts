@@ -21,19 +21,20 @@ export class LapDataParser {
     const numCars = isFormat2026 ? 24 : 22;
     const lapData: LapData[] = [];
 
-    // Cada entrada de carro possui 54 bytes
-    const entrySize = 54;
+    const payloadLength = reader.remainingBytes();
+    // 2 bytes adicionais no final para timeTrialPBCarIdx e timeTrialRivalCarIdx
+    const detectedEntrySize = Math.max(45, Math.floor((payloadLength >= (numCars * 45) + 2 ? payloadLength - 2 : payloadLength) / numCars));
 
     for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(entrySize)) break;
+      if (!reader.hasRemaining(45)) break;
       const startOffset = reader.getOffset();
       const entry = LapDataParser.parseLapDataEntry(reader);
       lapData.push(entry);
 
-      // Alinhamento exato de 54 bytes
+      // Alinhamento dinâmico exato
       const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < entrySize && reader.hasRemaining(entrySize - bytesRead)) {
-        reader.skip(entrySize - bytesRead);
+      if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
+        reader.skip(detectedEntrySize - bytesRead);
       }
     }
 

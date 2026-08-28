@@ -16,7 +16,6 @@ import { PitStatus } from '../core/models/lap-data';
 
 import {
   useCockpitTheme,
-  EventBadge,
   BatteryErsCard,
   TimingCard,
   CentralCockpit,
@@ -24,6 +23,8 @@ import {
   TyreStatusGrid,
   SessionFooter,
 } from '../cockpit';
+import { CockpitBackground } from '../cockpit/components/CockpitBackground';
+import { TelemetryInfoBar } from '../cockpit/components/TelemetryInfoBar';
 import { ERSDeployMode } from '../core/models/car-status';
 
 import { RaceStartOverlay } from '../components/momentary/RaceStartOverlay';
@@ -117,66 +118,40 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     (telemetry.engineDamage ?? 0) > 20;
 
   return (
-    <View
-      style={[
-        styles.safeArea,
-        {
-          backgroundColor: theme.background.primary,
-          paddingTop: Math.max(insets.top, 6),
-          paddingBottom: Math.max(insets.bottom, 6),
-          paddingLeft: Math.max(insets.left, 12),
-          paddingRight: Math.max(insets.right, 12)
-        }
-      ]}
-    >
-      <StatusBar hidden />
-      <View style={styles.container}>
-        {/* Header Superior: EventBadge no centro, Menu e Conexão à direita */}
-        <View style={styles.topHeader}>
-          <View style={styles.headerLeftSpacer} />
+    <CockpitBackground theme={theme}>
+      <View
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: 'transparent', // deixa o gradiente aparecer
+            paddingTop: Math.max(insets.top, 6),
+            paddingBottom: Math.max(insets.bottom, 6),
+            paddingLeft: Math.max(insets.left, 12),
+            paddingRight: Math.max(insets.right, 12)
+          }
+        ]}
+      >
+        <StatusBar hidden />
+        <View style={styles.container}>
+          {/* Header Superior: Barra de telemetria ocupando largura toda e botões flutuando */}
+          <View style={styles.topHeader}>
+            <TelemetryInfoBar theme={theme} />
 
-          <View style={styles.headerCenter}>
-            <EventBadge theme={theme} />
-          </View>
-
-          <View style={styles.headerRightGroup}>
-            {onNavigateToMenu && (
-              <TouchableOpacity
-                onPress={onNavigateToMenu}
-                style={styles.pillBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-              >
-                <Text style={styles.pillBtnIcon}>≡</Text>
-                <Text style={styles.pillBtnText}>MENU</Text>
+            <View style={styles.headerRightGroup}>
+              {onNavigateToMenu && (
+                <TouchableOpacity onPress={onNavigateToMenu} style={styles.pillBtn} activeOpacity={0.7}>
+                  <Text style={styles.pillBtnIcon}>≡</Text>
+                  <Text style={styles.pillBtnText}>MENU</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={cycleConnectionMode} style={[styles.pillBtn, { borderColor: telemetry.connected ? '#15803d' : '#991b1b' }]} activeOpacity={0.7}>
+                <View style={[styles.statusDot, { backgroundColor: telemetry.connected ? '#22c55e' : '#ef4444' }]} />
+                <Text style={styles.pillBtnText}>
+                  {telemetry.connected ? (connMode === 'MOCK' ? 'SIMULADOR' : 'CONECTADO') : 'DESCONECTADO'}
+                </Text>
               </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              onPress={cycleConnectionMode}
-              style={[
-                styles.pillBtn,
-                { borderColor: telemetry.connected ? '#15803d' : '#991b1b' }
-              ]}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: telemetry.connected ? '#22c55e' : '#ef4444' }
-                ]}
-              />
-              <Text style={styles.pillBtnText}>
-                {telemetry.connected
-                  ? connMode === 'MOCK'
-                    ? 'SIMULADOR'
-                    : 'CONECTADO'
-                  : 'DESCONECTADO'}
-              </Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
         {/* Mock Scenario Quick Bar */}
         {connMode === 'MOCK' && (
@@ -361,6 +336,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         )}
       </View>
     </View>
+  </CockpitBackground>
   );
 };
 
@@ -373,25 +349,18 @@ const styles = StyleSheet.create({
     flex: 1
   },
   topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    position: 'relative',
+    justifyContent: 'center',
     paddingHorizontal: 8,
     paddingBottom: 4,
     minHeight: 42,
   },
-  headerLeftSpacer: {
-    width: 140,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerRightGroup: {
-    width: 140,
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 6,
   },

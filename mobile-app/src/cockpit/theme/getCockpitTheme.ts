@@ -9,7 +9,7 @@
  */
 
 import { CockpitTelemetryState } from '../../core/state/telemetry-state';
-import { SafetyCarStatus, Weather } from '../../core/models/session';
+import { SafetyCarStatus, Weather, SessionType } from '../../core/models/session';
 import { PitStatus } from '../../core/models/lap-data';
 import { ERSDeployMode } from '../../core/models/car-status';
 import { CockpitTheme, CockpitStateKey } from './types';
@@ -56,19 +56,31 @@ function determineCockpitState(state: CockpitTelemetryState): CockpitStateKey {
     return CockpitStateKey.OVERTAKE;
   }
 
-  // P7 — Volta mais rápida (heurística local: lastLap foi o melhor)
-  // Só válido se lastLapTimeInMS > 0 e bestLapTimeInMS > 0
-  if (
-    state.lastLapTimeInMS > 0 &&
-    state.bestLapTimeInMS > 0 &&
-    state.lastLapTimeInMS === state.bestLapTimeInMS
-  ) {
-    return CockpitStateKey.FASTEST_LAP;
-  }
-
-  // P8 — Modo Reta (DRS ativo — melhor proxy para "straight mode" disponível)
+  // P7 — Modo Reta (Asas móveis / DRS ativo na reta)
   if (state.drsActive) {
     return CockpitStateKey.STRAIGHT_MODE;
+  }
+
+  // P8 — Volta mais rápida
+  // Ativa nos primeiros 12 segundos da nova volta após cruzar a linha com volta mais rápida,
+  // ou em sessões de classificação/Time Trial quando o piloto é P1.
+  const isFreshFastestLap =
+    state.lastLapTimeInMS > 0 &&
+    state.bestLapTimeInMS > 0 &&
+    state.lastLapTimeInMS === state.bestLapTimeInMS &&
+    state.currentLapTimeInMS > 0 &&
+    state.currentLapTimeInMS < 12000;
+
+  const isQualiPole =
+    state.carPosition === 1 &&
+    state.bestLapTimeInMS > 0 &&
+    (state.sessionType === SessionType.Qualifying1 ||
+     state.sessionType === SessionType.Qualifying2 ||
+     state.sessionType === SessionType.Qualifying3 ||
+     state.sessionType === SessionType.TimeTrial);
+
+  if (isFreshFastestLap || isQualiPole) {
+    return CockpitStateKey.FASTEST_LAP;
   }
 
   // P9 — Pista Molhada (chuva leve ou mais)

@@ -22,6 +22,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#1a0505',
       secondary: '#2a0a0a',
       glow: '#ef4444',
+      gradient: ['#2a0505', '#3d0a0a', '#150202'],
     },
     cardBorder: '#7f1d1d',
     shiftLights: {
@@ -46,6 +47,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#1a1200',
       secondary: '#261b00',
       glow: '#ca8a04',
+      gradient: ['#2a1f00', '#1f1600', '#120c00'],
     },
     cardBorder: '#713f12',
     shiftLights: {
@@ -70,6 +72,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#141000',
       secondary: '#1f1800',
       glow: '#b45309',
+      gradient: ['#241a00', '#1a1200', '#0f0900'],
     },
     cardBorder: '#78350f',
     shiftLights: {
@@ -94,6 +97,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#0c0e14',
       secondary: '#111420',
       glow: '#64748b',
+      gradient: ['#12141c', '#0c0e14', '#06070a'],
     },
     cardBorder: '#334155',
     shiftLights: {
@@ -118,6 +122,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#170511',
       secondary: '#220819',
       glow: '#be185d',
+      gradient: ['#2a0a1f', '#1f0813', '#100309'],
     },
     cardBorder: '#831843',
     shiftLights: {
@@ -142,6 +147,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#030b1a',
       secondary: '#051020',
       glow: '#1d4ed8',
+      gradient: ['#051530', '#030b1a', '#02050e'],
     },
     cardBorder: '#1e3a8a',
     shiftLights: {
@@ -166,6 +172,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#011418',
       secondary: '#011b20',
       glow: '#0891b2',
+      gradient: ['#012228', '#011820', '#000d11'],
     },
     cardBorder: '#164e63',
     shiftLights: {
@@ -190,6 +197,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#0d0514',
       secondary: '#130720',
       glow: '#7e22ce',
+      gradient: ['#1a0828', '#120520', '#08020f'],
     },
     cardBorder: '#581c87',
     shiftLights: {
@@ -214,6 +222,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#020e18',
       secondary: '#031420',
       glow: '#0284c7',
+      gradient: ['#031828', '#02101c', '#010810'],
     },
     cardBorder: '#075985',
     shiftLights: {
@@ -238,6 +247,7 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
       primary: '#090a0f',
       secondary: '#0f1118',
       glow: 'transparent',
+      gradient: ['#0f1118', '#0a0b10', '#050609'],
     },
     cardBorder: '#1e2436',
     shiftLights: {

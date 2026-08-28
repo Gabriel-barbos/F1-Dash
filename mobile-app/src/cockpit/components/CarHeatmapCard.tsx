@@ -109,15 +109,15 @@ export const CarHeatmapCard: React.FC<CarHeatmapCardProps> = memo(({
         <Text style={styles.tyresLabel}>STATUS PNEUS</Text>
         <View style={styles.tyresGrid}>
           {[
-            { pos: 'DE', val: tyresWear[2] ?? 0 },
-            { pos: 'DD', val: tyresWear[3] ?? 0 },
-            { pos: 'TE', val: tyresWear[0] ?? 0 },
-            { pos: 'TD', val: tyresWear[1] ?? 0 },
+            { pos: 'DE', val: Math.round(tyresWear[2] ?? 0) },
+            { pos: 'DD', val: Math.round(tyresWear[3] ?? 0) },
+            { pos: 'TE', val: Math.round(tyresWear[0] ?? 0) },
+            { pos: 'TD', val: Math.round(tyresWear[1] ?? 0) },
           ].map(({ pos, val }) => (
             <View key={pos} style={styles.tyreChip}>
               <Text style={styles.tyreChipPos}>{pos}</Text>
               <Text style={[styles.tyreChipVal, { color: getDamageColor(val) }]}>
-                {(10 - Math.floor(val / 10))}/10
+                {Math.max(0, 10 - Math.floor(val / 10))}/10
               </Text>
             </View>
           ))}

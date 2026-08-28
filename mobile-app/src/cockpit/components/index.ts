@@ -3,6 +3,8 @@
  */
 
 export { EventBadge } from './EventBadge';
+export { CockpitBackground } from './CockpitBackground';
+export { TelemetryInfoBar } from './TelemetryInfoBar';
 export { BatteryErsCard } from './BatteryErsCard';
 export { TimingCard } from './TimingCard';
 export { ShiftLightsBar } from './ShiftLightsBar';

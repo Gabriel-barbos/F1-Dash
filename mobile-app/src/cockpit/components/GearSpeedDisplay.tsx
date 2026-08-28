@@ -54,15 +54,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: 170,
-    height: 180,
+    height: 240,
   },
   rpmRow: {
     alignItems: 'center',
-    marginBottom: -6,
+    marginBottom: 20,
   },
   rpmValue: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     letterSpacing: 1.2,
     fontVariant: ['tabular-nums'],
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   },
   gearText: {
     color: '#ffffff',
-    fontSize: 98,
+    fontSize: 128,
     fontWeight: '900',
     lineHeight: 104,
     textAlign: 'center',
@@ -85,11 +85,11 @@ const styles = StyleSheet.create({
   },
   speedRow: {
     alignItems: 'center',
-    marginTop: -8,
+    marginTop: 20,
   },
   speedValue: {
     color: '#ffffff',
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '900',
     letterSpacing: 0.8,
     lineHeight: 34,
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   speedLabel: {
     color: '#64748b',
-    fontSize: 10,
+    fontSize: 15,
     fontWeight: '800',
     marginTop: -2,
   },

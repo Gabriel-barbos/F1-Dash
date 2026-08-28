@@ -7,7 +7,7 @@ export class Formatters {
    * Formata milissegundos no formato M:SS.mmm (ex: 1:24.382)
    */
   public static formatLapTime(ms: number): string {
-    if (!ms || ms <= 0) return '--:--.---';
+    if (!ms || ms <= 0 || ms > 3600000 || isNaN(ms)) return '--:--.---';
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     const millis = ms % 1000;

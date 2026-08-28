@@ -57,7 +57,8 @@ interface SingleTyreProps {
 
 const SingleTyre: React.FC<SingleTyreProps> = memo(({ pos, temp, psi, wearPct }) => {
   const tempColor = getTempColor(temp);
-  const lifeRemaining = Math.max(0, 10 - Math.floor(wearPct / 10));
+  const roundedWear = Math.min(100, Math.max(0, Math.round(wearPct || 0)));
+  const lifeRemaining = Math.max(0, 10 - Math.floor(roundedWear / 10));
 
   return (
     <View style={styles.tyreCard}>
@@ -66,11 +67,11 @@ const SingleTyre: React.FC<SingleTyreProps> = memo(({ pos, temp, psi, wearPct })
         <Text style={styles.tyreLife}>{lifeRemaining}/10</Text>
       </View>
 
-      <Text style={[styles.tyreTemp, { color: tempColor }]}>{temp}°C</Text>
+      <Text style={[styles.tyreTemp, { color: tempColor }]}>{Math.round(temp || 0)}°C</Text>
 
       <View style={styles.tyreFooter}>
-        <Text style={styles.tyrePsi}>{psi.toFixed(1)} PSI</Text>
-        <Text style={styles.tyreWearPct}>{wearPct}% desg</Text>
+        <Text style={styles.tyrePsi}>{psi ? psi.toFixed(1) : '23.5'} PSI</Text>
+        <Text style={styles.tyreWearPct}>{roundedWear}% desg</Text>
       </View>
     </View>
   );

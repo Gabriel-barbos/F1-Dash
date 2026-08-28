@@ -16,8 +16,8 @@ export enum CockpitStateKey {
   FORMATION_LAP  = 4,
   PIT_LANE       = 5,
   OVERTAKE       = 6,
-  FASTEST_LAP    = 7,
-  STRAIGHT_MODE  = 8,
+  STRAIGHT_MODE  = 7,
+  FASTEST_LAP    = 8,
   WET_TRACK      = 9,
   NORMAL         = 10,
 }
@@ -47,6 +47,8 @@ export interface CockpitBackground {
   secondary: string;
   /** Cor de glow/brilho ambiente para bordas e sombras */
   glow: string;
+  /** 3 stops pra LinearGradient (topo → meio → base) */
+  gradient: [string, string, string];
 }
 
 /**
