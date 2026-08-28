@@ -1,8 +1,8 @@
 import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
 import { TelemetryStore } from '../core/state/telemetry-store';
-import { nativeUdpReceiver } from './native-udp-receiver';
+import { nativeUdpReceiver, isRunningInExpoGo } from './native-udp-receiver';
 import { ERSDeployMode, VisualTyreCompound } from '../core/models/car-status';
-import { SafetyCarStatus } from '../core/models/session';
+import { SafetyCarStatus, Weather } from '../core/models/session';
 import { PitStatus } from '../core/models/lap-data';
 
 export type TelemetryCallback = (state: CockpitTelemetryState) => void;
@@ -24,8 +24,8 @@ class TelemetryService {
   private momentaryListeners: Set<(type: MomentaryEventType) => void> = new Set();
   private currentState: CockpitTelemetryState = { ...INITIAL_TELEMETRY_STATE };
   private mockInterval: any = null;
-  private serverHost: string = '192.168.1.104:5173';
-  private mode: ConnectionMode = 'UDP_NATIVE';
+  private serverHost: string = '192.168.1.107:5173';
+  private mode: ConnectionMode = isRunningInExpoGo() ? 'MOCK' : 'UDP_NATIVE';
   private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
 
@@ -43,6 +43,20 @@ class TelemetryService {
         this.notify();
       }
     });
+
+    if (isRunningInExpoGo()) {
+      // No Expo Go, o simulador (MOCK) inicia por padrão para testes sem erro de módulo nativo
+      this.mode = 'MOCK';
+      this.startInternalMock();
+    } else {
+      // No APK compilado para Android, o UDP nativo escuta a porta 20777 direto no celular
+      this.mode = 'UDP_NATIVE';
+      this.startNativeUdp();
+    }
+  }
+
+  public isExpoGo(): boolean {
+    return isRunningInExpoGo();
   }
 
   public subscribe(callback: TelemetryCallback): () => void {
@@ -63,8 +77,10 @@ class TelemetryService {
     this.mode = newMode;
     if (this.mode === 'UDP_NATIVE') {
       this.stopInternalMock();
-      this.disconnectWs();
       this.startNativeUdp();
+      // Em celulares com Expo Go onde UDP direto não é liberado pelo SO,
+      // conecta via WebSocket à bridge do PC para que os pacotes do PS5 cheguem com 60 FPS
+      this.connectWs();
     } else if (this.mode === 'WEBSOCKET') {
       this.stopInternalMock();
       this.stopNativeUdp();
@@ -122,7 +138,7 @@ class TelemetryService {
         this.currentState.connected = false;
         this.notify();
         setTimeout(() => {
-          if (this.mode === 'WEBSOCKET' && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
+          if ((this.mode === 'WEBSOCKET' || this.mode === 'UDP_NATIVE') && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
             this.connectWs();
           }
         }, 2500);
@@ -159,6 +175,8 @@ class TelemetryService {
   public isMockActive(): boolean {
     return this.mode === 'MOCK';
   }
+
+  private currentScenario: string = 'NORMAL';
 
   private startInternalMock() {
     this.stopInternalMock();
@@ -199,40 +217,28 @@ class TelemetryService {
       const revPercent = Math.min(100, Math.max(0, ((rpm - 4000) / (13500 - 4000)) * 100));
       const ersPercent = Math.max(10, 100 - (tick % 300) * 0.3);
 
+      const isNormal = this.currentScenario === 'NORMAL';
+
       this.currentState = {
         ...this.currentState,
         connected: true,
         packetsPerSecond: 60,
-        gear: gear,
+        gear: this.currentScenario === 'PIT_LANE' ? 2 : gear,
         engineRPM: rpm,
-        speed: Math.round(speed),
+        speed: this.currentScenario === 'PIT_LANE' ? 78 : Math.round(speed),
         throttle: throttle,
         brake: brake,
         revLightsPercent: revPercent,
-        drsActive: speed > 240 && gear >= 6,
-        drsAllowed: gear >= 5,
+        drsActive: isNormal ? (speed > 240 && gear >= 6) : this.currentState.drsActive,
+        drsAllowed: isNormal ? (gear >= 5) : this.currentState.drsAllowed,
         ersPercentage: ersPercent,
-        ersDeployMode: speed > 260 ? ERSDeployMode.Overtake : ERSDeployMode.Medium,
-        carPosition: 5,
-        currentLapNum: 23,
-        totalLaps: 58,
+        ersDeployMode: isNormal
+          ? (speed > 260 ? ERSDeployMode.Overtake : ERSDeployMode.Medium)
+          : this.currentState.ersDeployMode,
+        carPosition: 3,
+        currentLapNum: 12,
+        totalLaps: 56,
         currentLapTimeInMS: (tick * 50) % 84000,
-        lastLapTimeInMS: 84305,
-        bestLapTimeInMS: 83942,
-        visualTyreCompound: VisualTyreCompound.F1_Hard,
-        tyresAgeLaps: 12,
-        tyresSurfaceTemperature: [98, 99, 102, 101],
-        tyresPressure: [23.8, 23.9, 24.1, 24.0],
-        brakesTemperature: [450, 470, 520, 510],
-        tyresWear: [18, 21, 25, 23],
-        frontLeftWingDamage: (tick % 500 > 350) ? 25 : 0,
-        frontRightWingDamage: 0,
-        floorDamage: (tick % 500 > 350) ? 15 : 0,
-        diffuserDamage: 0,
-        sidepodDamage: 0,
-        gearBoxDamage: 0,
-        rearWingDamage: 0,
-        engineDamage: 4
       };
 
       this.notify();
@@ -246,86 +252,111 @@ class TelemetryService {
     }
   }
 
-  public forceStateScenario(scenario: 'NORMAL' | 'DRS' | 'OVERTAKE' | 'SAFETY_CAR' | 'VSC' | 'RED_FLAG' | 'PIT_LANE' | 'DAMAGE') {
+  public forceStateScenario(scenario: 'NORMAL' | 'DRS' | 'OVERTAKE' | 'SAFETY_CAR' | 'VSC' | 'RED_FLAG' | 'PIT_LANE' | 'DAMAGE' | 'FASTEST_LAP' | 'WET') {
+    this.currentScenario = scenario;
+
+    // Reset base flags
+    const baseReset = {
+      safetyCarStatus: SafetyCarStatus.None,
+      isRedFlagActive: false,
+      pitStatus: PitStatus.None,
+      pitLimiterActive: false,
+      drsActive: false,
+      drsAllowed: false,
+      ersDeployMode: ERSDeployMode.Medium,
+      weather: Weather.Clear,
+      visualTyreCompound: VisualTyreCompound.F1_Hard,
+      frontLeftWingDamage: 0,
+      frontRightWingDamage: 0,
+      floorDamage: 0,
+      rearWingDamage: 0,
+      engineDamage: 0,
+      lastLapTimeInMS: 88456,
+      bestLapTimeInMS: 87891,
+    };
+
     switch (scenario) {
       case 'SAFETY_CAR':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           safetyCarStatus: SafetyCarStatus.Full,
           safetyCarDelta: 12.543,
-          isRedFlagActive: false,
-          pitStatus: PitStatus.None
         };
         break;
       case 'VSC':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           safetyCarStatus: SafetyCarStatus.Virtual,
           safetyCarDelta: -0.421,
-          isRedFlagActive: false,
-          pitStatus: PitStatus.None
         };
         break;
       case 'RED_FLAG':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           isRedFlagActive: true,
-          safetyCarStatus: SafetyCarStatus.None,
-          pitStatus: PitStatus.None
         };
         break;
       case 'PIT_LANE':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           pitStatus: PitStatus.InPitArea,
           pitLimiterActive: true,
           pitSpeedLimit: 80,
           speed: 78,
           gear: 2,
-          safetyCarStatus: SafetyCarStatus.None,
-          isRedFlagActive: false
         };
         break;
       case 'OVERTAKE':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           ersDeployMode: ERSDeployMode.Overtake,
-          drsActive: false,
-          safetyCarStatus: SafetyCarStatus.None,
-          isRedFlagActive: false
         };
         break;
       case 'DRS':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           drsActive: true,
           drsAllowed: true,
-          ersDeployMode: ERSDeployMode.Medium,
-          safetyCarStatus: SafetyCarStatus.None,
-          isRedFlagActive: false
         };
         break;
       case 'DAMAGE':
         this.currentState = {
           ...this.currentState,
+          ...baseReset,
           frontLeftWingDamage: 45,
           frontRightWingDamage: 10,
           floorDamage: 30,
           rearWingDamage: 15,
-          engineDamage: 22
+          engineDamage: 22,
+        };
+        break;
+      case 'FASTEST_LAP':
+        this.currentState = {
+          ...this.currentState,
+          ...baseReset,
+          lastLapTimeInMS: 83210,
+          bestLapTimeInMS: 83210,
+        };
+        break;
+      case 'WET':
+        this.currentState = {
+          ...this.currentState,
+          ...baseReset,
+          weather: Weather.HeavyRain,
+          visualTyreCompound: VisualTyreCompound.F1_Wet,
         };
         break;
       case 'NORMAL':
       default:
         this.currentState = {
           ...this.currentState,
-          safetyCarStatus: SafetyCarStatus.None,
-          isRedFlagActive: false,
-          pitStatus: PitStatus.None,
-          drsActive: false,
-          frontLeftWingDamage: 0,
-          frontRightWingDamage: 0,
-          floorDamage: 0
+          ...baseReset,
         };
         break;
     }

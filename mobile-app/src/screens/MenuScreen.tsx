@@ -5,9 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform
+  Platform,
+  TextInput
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Network from 'expo-network';
 import { telemetryService, ConnectionMode, MomentaryEventType } from '../services/telemetry-service';
 import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
 
@@ -17,10 +19,25 @@ interface MenuScreenProps {
 
 export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
   const insets = useSafeAreaInsets();
-  const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(telemetryService.isMockActive() ? ({} as any) : INITIAL_TELEMETRY_STATE);
+  const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(
+    telemetryService.isMockActive() ? ({} as any) : INITIAL_TELEMETRY_STATE
+  );
   const [connMode, setConnMode] = useState<ConnectionMode>(telemetryService.getMode());
+  const [hostInput, setHostInput] = useState<string>(telemetryService.getServerHost());
+  const [deviceIp, setDeviceIp] = useState<string>('Obtendo IP...');
 
   const deviceName = telemetryService.getDeviceName();
+  const isExpo = telemetryService.isExpoGo();
+
+  useEffect(() => {
+    Network.getIpAddressAsync()
+      .then((ip) => setDeviceIp(ip || 'Verifique no Wi-Fi'))
+      .catch(() => setDeviceIp('Verifique no Wi-Fi'));
+  }, []);
+
+  const handleSaveHost = () => {
+    telemetryService.setServerHost(hostInput);
+  };
 
   useEffect(() => {
     const unsub = telemetryService.subscribe((state) => {
@@ -68,7 +85,14 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
       {/* Header com Status da Conexão e Dispositivo */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.titleBadge}>F1 TELEMETRY HUB</Text>
+          <View style={styles.titleBadgeRow}>
+            <Text style={styles.titleBadge}>F1 TELEMETRY HUB</Text>
+            <View style={[styles.envBadge, isExpo ? styles.envBadgeExpo : styles.envBadgeApk]}>
+              <Text style={[styles.envBadgeText, isExpo ? styles.envTextExpo : styles.envTextApk]}>
+                {isExpo ? '📱 EXPO GO' : '🚀 APK STANDALONE'}
+              </Text>
+            </View>
+          </View>
           <Text style={styles.mainTitle}>COCKPIT CONTROL CENTER</Text>
         </View>
 
@@ -93,10 +117,10 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
               {isConnected
                 ? connMode === 'MOCK'
                   ? 'SIMULADOR ATIVO (60 FPS)'
-                  : `ONLINE • F1 ${telemetry.gameYear ?? 2025}`
-                : connMode === 'UDP_NATIVE'
-                ? 'ESCUTANDO PORTA UDP 20777...'
-                : 'AGUARDANDO CONEXÃO...'}
+                  : (telemetry.packetsPerSecond > 0 || (telemetry.speed > 0 || telemetry.engineRPM > 0))
+                  ? `TRANSMITINDO (${telemetry.packetsPerSecond || 60} HZ) • F1 ${telemetry.gameYear ?? 2025}`
+                  : 'SERVIDOR CONECTADO (AGUARDANDO O JOGO NO PS5...)'
+                : 'AGUARDANDO CONEXÃO COM O SERVIDOR...'}
             </Text>
           </View>
         </View>
@@ -124,7 +148,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
                 <Text style={styles.sourceTitle}>PS5 (PLAYSTATION 5)</Text>
               </View>
               <Text style={styles.sourceDesc}>
-                Recepção direta UDP 20777 do F1 no console
+                {isExpo
+                  ? 'Recepção direta no APK (No Expo Go, use MOCK ou PC)'
+                  : 'Recepção direta UDP 20777 do F1 no console'}
               </Text>
               <View style={styles.sourceRadio}>
                 <View
@@ -198,6 +224,25 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
                 </Text>
               </View>
             </TouchableOpacity>
+          </View>
+
+          {/* Configuração de IP do Servidor PC / Bridge */}
+          <View style={styles.serverHostCard}>
+            <Text style={styles.serverHostLabel}>IP DO SERVIDOR / PC:</Text>
+            <View style={styles.serverHostInputRow}>
+              <TextInput
+                value={hostInput}
+                onChangeText={setHostInput}
+                placeholder="192.168.1.107:5173"
+                placeholderTextColor="#64748b"
+                style={styles.serverHostInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity onPress={handleSaveHost} style={styles.serverHostSaveBtn}>
+                <Text style={styles.serverHostSaveText}>CONECTAR</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Launch Display Button */}
@@ -310,6 +355,48 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
               </View>
             </TouchableOpacity>
           </ScrollView>
+
+          {/* Guia Rápido: PS5 Direto no App / MOCK no Expo Go */}
+          <View style={styles.ps5GuideBox}>
+            <View style={styles.guideHeaderRow}>
+              <Text style={styles.ps5GuideTitle}>
+                {isExpo ? '🎮 MOCK ATIVO NO EXPO GO' : '🎮 PS5 DIRETO NO CELULAR (SEM PC!)'}
+              </Text>
+              <View style={[styles.standaloneBadge, isExpo && styles.standaloneBadgeExpo]}>
+                <Text style={[styles.standaloneBadgeText, isExpo && styles.standaloneBadgeTextExpo]}>
+                  {isExpo ? 'SIMULADOR 60 FPS' : '100% INDEPENDENTE'}
+                </Text>
+              </View>
+            </View>
+            {isExpo ? (
+              <>
+                <Text style={styles.ps5GuideItem}>
+                  • O <Text style={styles.guideGreen}>MOCK interno a 60 FPS</Text> está ativo para testar o cockpit, marchas, RPM e telas momentâneas!
+                </Text>
+                <Text style={styles.ps5GuideItem}>
+                  • Para ligar direto no PS5 sem PC, gere o APK com <Text style={styles.guideHighlight}>eas build -p android --profile preview</Text>.
+                </Text>
+                <Text style={styles.ps5GuideItem}>
+                  • Ou pelo Expo Go via PC bridge, configure o IP: <Text style={styles.guideHighlight}>{hostInput}</Text>.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.ps5GuideItem}>
+                  1. Conecte o celular e o PS5 no <Text style={styles.guideHighlight}>mesmo Wi-Fi</Text>.
+                </Text>
+                <Text style={styles.ps5GuideItem}>
+                  2. No F1 do PS5: <Text style={styles.guideHighlight}>Opções &gt; Configurações de Telemetria</Text>.
+                </Text>
+                <Text style={styles.ps5GuideItem}>
+                  3. Telemetria UDP: <Text style={styles.guideGreen}>LIGADO</Text> | Porta: <Text style={styles.guideHighlight}>20777</Text> | Taxa: <Text style={styles.guideHighlight}>60 Hz</Text>.
+                </Text>
+                <Text style={styles.ps5GuideItem}>
+                  4. Modo de Difusão (Broadcast): <Text style={styles.guideGreen}>LIGADO</Text> (Recomendado) ou IP deste celular: <Text style={styles.guideHighlight}>{deviceIp}</Text>.
+                </Text>
+              </>
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -579,5 +666,135 @@ const styles = StyleSheet.create({
   testCardFinish: {
     borderLeftWidth: 3,
     borderLeftColor: '#ffffff'
+  },
+  serverHostCard: {
+    backgroundColor: '#0d121f',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginTop: 4
+  },
+  serverHostLabel: {
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '800',
+    marginBottom: 4
+  },
+  serverHostInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  serverHostInput: {
+    flex: 1,
+    backgroundColor: '#080b12',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#263148',
+    color: '#ffffff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  serverHostSaveBtn: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#38bdf8'
+  },
+  serverHostSaveText: {
+    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: '900'
+  },
+  ps5GuideBox: {
+    backgroundColor: '#090d17',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1e2638',
+    padding: 8,
+    marginTop: 6
+  },
+  ps5GuideTitle: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    marginBottom: 3
+  },
+  ps5GuideItem: {
+    color: '#94a3b8',
+    fontSize: 8.5,
+    fontWeight: '600',
+    marginVertical: 1
+  },
+  guideHighlight: {
+    color: '#f8fafc',
+    fontWeight: '800'
+  },
+  guideGreen: {
+    color: '#22c55e',
+    fontWeight: '900'
+  },
+  guideHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4
+  },
+  standaloneBadge: {
+    backgroundColor: '#052e16',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4
+  },
+  standaloneBadgeText: {
+    color: '#4ade80',
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  standaloneBadgeExpo: {
+    backgroundColor: '#172554',
+    borderColor: '#38bdf8'
+  },
+  standaloneBadgeTextExpo: {
+    color: '#38bdf8'
+  },
+  titleBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  envBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1
+  },
+  envBadgeExpo: {
+    backgroundColor: '#1e1b4b',
+    borderColor: '#818cf8'
+  },
+  envBadgeApk: {
+    backgroundColor: '#052e16',
+    borderColor: '#22c55e'
+  },
+  envBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  envTextExpo: {
+    color: '#a5b4fc'
+  },
+  envTextApk: {
+    color: '#4ade80'
   }
 });
