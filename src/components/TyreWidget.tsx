@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { VisualTyreCompound } from '../core/models/car-status';
-import { Formatters } from '../core/utils/formatters';
+import { VisualTyreCompound, Formatters } from '@f1-dash/telemetry-core';
 
 interface TyreWidgetProps {
   compound: VisualTyreCompound;

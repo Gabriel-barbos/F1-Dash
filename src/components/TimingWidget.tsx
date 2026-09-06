@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Formatters } from '../core/utils/formatters';
+import { Formatters } from '@f1-dash/telemetry-core';
 
 interface TimingWidgetProps {
   position: number;

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ERSDeployMode } from '../core/models/car-status';
-import { Formatters } from '../core/utils/formatters';
+import { ERSDeployMode, Formatters } from '@f1-dash/telemetry-core';
 
 interface ERSWidgetProps {
   ersPercentage: number;

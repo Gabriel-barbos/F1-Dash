@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SafetyCarStatus } from '../core/models/session';
+import { SafetyCarStatus } from '@f1-dash/telemetry-core';
 
 interface SafetyCarBannerProps {
   status: SafetyCarStatus;

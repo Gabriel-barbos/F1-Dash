@@ -9,10 +9,14 @@ import {
   Animated
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
+import {
+  CockpitTelemetryState,
+  INITIAL_COCKPIT_TELEMETRY_STATE,
+  SafetyCarStatus,
+  PitStatus,
+  ERSDeployMode
+} from '@f1-dash/telemetry-core';
 import { telemetryService, ConnectionMode, MomentaryEventType } from '../services/telemetry-service';
-import { SafetyCarStatus } from '../core/models/session';
-import { PitStatus } from '../core/models/lap-data';
 
 import {
   useCockpitTheme,
@@ -21,11 +25,11 @@ import {
   CentralCockpit,
   CarHeatmapCard,
   TyreStatusGrid,
+  CarDamageMap,
   SessionFooter,
 } from '../cockpit';
 import { CockpitBackground } from '../cockpit/components/CockpitBackground';
 import { TelemetryInfoBar } from '../cockpit/components/TelemetryInfoBar';
-import { ERSDeployMode } from '../core/models/car-status';
 
 import { RaceStartOverlay } from '../components/momentary/RaceStartOverlay';
 import { CarDamageMomentaryOverlay } from '../components/momentary/CarDamageMomentaryOverlay';
@@ -44,7 +48,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   initialMomentaryOverlay = null
 }) => {
   const insets = useSafeAreaInsets();
-  const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(INITIAL_TELEMETRY_STATE);
+  const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(INITIAL_COCKPIT_TELEMETRY_STATE);
   const [connMode, setConnMode] = useState<ConnectionMode>(telemetryService.getMode());
   const [activeMomentaryOverlay, setActiveMomentaryOverlay] = useState<MomentaryEventType | null>(
     initialMomentaryOverlay
@@ -95,14 +99,11 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     };
   }, []);
 
-  const cycleConnectionMode = () => {
-    let nextMode: ConnectionMode = 'UDP_NATIVE';
-    if (connMode === 'UDP_NATIVE') nextMode = 'WEBSOCKET';
-    else if (connMode === 'WEBSOCKET') nextMode = 'MOCK';
-    else nextMode = 'UDP_NATIVE';
-
-    setConnMode(nextMode);
-    telemetryService.setMode(nextMode);
+  const handleConnectionPress = () => {
+    // Reconecta o WebSocket e garante modo WEBSOCKET
+    telemetryService.setMode('WEBSOCKET');
+    setConnMode('WEBSOCKET');
+    telemetryService.connectWs();
   };
 
   const handleDismissOverlay = () => {
@@ -144,10 +145,38 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                   <Text style={styles.pillBtnText}>MENU</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity onPress={cycleConnectionMode} style={[styles.pillBtn, { borderColor: telemetry.connected ? '#15803d' : '#991b1b' }]} activeOpacity={0.7}>
-                <View style={[styles.statusDot, { backgroundColor: telemetry.connected ? '#22c55e' : '#ef4444' }]} />
+              <TouchableOpacity
+                onPress={handleConnectionPress}
+                style={[
+                  styles.pillBtn,
+                  {
+                    borderColor: !telemetry.connected
+                      ? '#991b1b'
+                      : (telemetry.packetsPerSecond ?? 0) > 0
+                      ? '#15803d'
+                      : '#b45309'
+                  }
+                ]}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    {
+                      backgroundColor: !telemetry.connected
+                        ? '#ef4444'
+                        : (telemetry.packetsPerSecond ?? 0) > 0
+                        ? '#22c55e'
+                        : '#f59e0b'
+                    }
+                  ]}
+                />
                 <Text style={styles.pillBtnText}>
-                  {telemetry.connected ? (connMode === 'MOCK' ? 'SIMULADOR' : 'CONECTADO') : 'DESCONECTADO'}
+                  {!telemetry.connected
+                    ? 'RECONECTAR PC'
+                    : (telemetry.packetsPerSecond ?? 0) > 0
+                    ? `ONLINE • ${telemetry.packetsPerSecond} HZ`
+                    : 'AGUARDANDO PISTA'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -209,6 +238,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
               <TouchableOpacity onPress={() => telemetryService.forceStateScenario('FASTEST_LAP')} style={styles.scenarioBtn}>
                 <Text style={styles.scenarioBtnText}>Volta Rápida</Text>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('DAMAGE')} style={styles.scenarioBtn}>
+                <Text style={styles.scenarioBtnText}>Dano</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => telemetryService.forceStateScenario('WET')} style={styles.scenarioBtn}>
                 <Text style={styles.scenarioBtnText}>Chuva</Text>
               </TouchableOpacity>
@@ -225,23 +257,23 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
             {/* Coluna Esquerda: Bateria no Topo + Posição e Tempos embaixo */}
             <View style={styles.leftColumn}>
               <BatteryErsCard
-                batteryPercent={telemetry.ersPercentage ?? 100}
-                ersStoreEnergy={telemetry.ersStoreEnergy ?? 4_000_000}
+                batteryPercent={telemetry.ersPercentage ?? 0}
+                ersStoreEnergy={telemetry.ersStoreEnergy ?? 0}
                 ersDeployedThisLap={telemetry.ersDeployedThisLap ?? 0}
                 ersHarvestedThisLap={telemetry.ersHarvestedThisLapMGUK ?? 0}
                 boostActive={telemetry.ersDeployMode === ERSDeployMode.Overtake}
                 theme={theme}
               />
               <TimingCard
-                position={telemetry.carPosition ?? 3}
-                currentLap={telemetry.currentLapNum ?? 12}
-                totalLaps={telemetry.totalLaps ?? 56}
-                currentLapTimeMS={telemetry.currentLapTimeInMS ?? 56234}
-                lastLapTimeMS={telemetry.lastLapTimeInMS ?? 88456}
-                bestLapTimeMS={telemetry.bestLapTimeInMS ?? 87891}
-                deltaFrontMS={telemetry.deltaToCarInFrontInMS ?? -247}
-                sector1TimeMS={telemetry.sector1TimeInMS ?? 28120}
-                sector2TimeMS={telemetry.sector2TimeInMS ?? 29310}
+                position={telemetry.carPosition ?? 0}
+                currentLap={telemetry.currentLapNum ?? 0}
+                totalLaps={telemetry.totalLaps ?? 0}
+                currentLapTimeMS={telemetry.currentLapTimeInMS ?? 0}
+                lastLapTimeMS={telemetry.lastLapTimeInMS ?? 0}
+                bestLapTimeMS={telemetry.bestLapTimeInMS ?? 0}
+                deltaFrontMS={telemetry.deltaToCarInFrontInMS ?? 0}
+                sector1TimeMS={telemetry.sector1TimeInMS ?? 0}
+                sector2TimeMS={telemetry.sector2TimeInMS ?? 0}
                 currentSector={telemetry.currentSector ?? 0}
                 lapInvalid={telemetry.currentLapInvalid ?? false}
                 theme={theme}
@@ -251,27 +283,46 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
             {/* Coluna Central: ShiftLights + Aceleração + Marcha/Speed + Freio */}
             <View style={styles.centerColumn}>
               <CentralCockpit
-                gear={telemetry.gear ?? 7}
-                speed={telemetry.speed ?? 375}
-                rpm={telemetry.engineRPM ?? 7600}
-                maxRpm={telemetry.maxRPM ?? 13500}
-                revPercent={telemetry.revLightsPercent ?? 75}
-                throttle={telemetry.throttle ?? 1.0}
+                gear={telemetry.gear ?? 0}
+                speed={telemetry.speed ?? 0}
+                rpm={telemetry.engineRPM ?? 0}
+                maxRpm={telemetry.maxRPM || 13500}
+                revPercent={telemetry.revLightsPercent ?? 0}
+                throttle={telemetry.throttle ?? 0.0}
                 brake={telemetry.brake ?? 0.0}
                 drsActive={telemetry.drsActive ?? false}
                 drsAllowed={telemetry.drsAllowed ?? false}
+                is2026Regulations={telemetry.is2026Regulations ?? false}
+                activeAeroMode={telemetry.activeAeroMode ?? 0}
+                activeAeroAvailable={telemetry.activeAeroAvailable ?? false}
+                activeAeroActivationDistance={telemetry.activeAeroActivationDistance ?? 0}
+                overtakeActive={telemetry.overtakeActive ?? false}
+                overtakeAvailable={telemetry.overtakeAvailable ?? false}
+                overtakeActivationDistance={telemetry.overtakeActivationDistance ?? 0}
+                ersDeployMode={telemetry.ersDeployMode}
                 theme={theme}
               />
             </View>
 
-            {/* Coluna Direita: Painel de Temperatura e Status dos Pneus */}
+            {/* Coluna Direita: Mapa Visual de Danos e Telemetria dos Pneus */}
             <View style={styles.rightColumn}>
-              <TyreStatusGrid
-                compound={telemetry.visualTyreCompound ?? 18}
-                tyresAgeLaps={telemetry.tyresAgeLaps ?? 1}
-                surfaceTemps={telemetry.tyresSurfaceTemperature ?? [102, 101, 98, 99]}
-                pressures={telemetry.tyresPressure ?? [24.1, 24.0, 23.8, 23.9]}
-                wear={telemetry.tyresWear ?? [25, 23, 18, 21]}
+              <CarDamageMap
+                frontLeftWingDamage={telemetry.frontLeftWingDamage ?? 0}
+                frontRightWingDamage={telemetry.frontRightWingDamage ?? 0}
+                rearWingDamage={telemetry.rearWingDamage ?? 0}
+                floorDamage={telemetry.floorDamage ?? 0}
+                diffuserDamage={telemetry.diffuserDamage ?? 0}
+                sidepodDamage={telemetry.sidepodDamage ?? 0}
+                gearBoxDamage={telemetry.gearBoxDamage ?? 0}
+                engineDamage={telemetry.engineDamage ?? 0}
+                tyresWear={telemetry.tyresWear ?? [0, 0, 0, 0]}
+                tyresSurfaceTemp={telemetry.tyresSurfaceTemperature ?? [0, 0, 0, 0]}
+                tyresPressure={telemetry.tyresPressure ?? [0, 0, 0, 0]}
+                brakesTemperature={telemetry.brakesTemperature ?? [0, 0, 0, 0]}
+                compound={telemetry.visualTyreCompound ?? 16}
+                tyresAgeLaps={telemetry.tyresAgeLaps ?? 0}
+                drsFault={telemetry.drsFault}
+                engineBlown={telemetry.engineBlown}
                 theme={theme}
               />
             </View>
@@ -323,7 +374,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
           <PitLaneMomentaryOverlay
             onDismiss={handleDismissOverlay}
             speedLimit={telemetry.pitSpeedLimit ?? 80}
-            currentSpeed={telemetry.speed ?? 78}
+            currentSpeed={telemetry.speed ?? 0}
             timeInLaneMS={telemetry.pitLaneTimeInLaneInMS ?? 0}
           />
         )}
@@ -331,7 +382,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         {activeMomentaryOverlay === 'CHEQUERED_FLAG' && (
           <ChequeredFlagOverlay
             onDismiss={handleDismissOverlay}
-            position={telemetry.carPosition ?? 1}
+            position={telemetry.carPosition ?? 0}
           />
         )}
       </View>
@@ -445,7 +496,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   rightColumn: {
-    width: 230,
+    width: 240,
     alignItems: 'center',
     justifyContent: 'center',
   },

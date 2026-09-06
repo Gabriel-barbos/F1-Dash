@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "mobile": "npm --prefix mobile-app start",
     "mock": "tsx simulator/mock-sender.ts",
     "diag": "tsx simulator/diagnostic-server.ts",
     "build": "vite build",

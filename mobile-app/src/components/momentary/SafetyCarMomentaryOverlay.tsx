@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { MomentaryOverlayContainer } from './MomentaryOverlayContainer';
 import { SafetyCarBanner } from '../SafetyCarBanner';
-import { SafetyCarStatus } from '../../core/models/session';
+import { SafetyCarStatus } from '@f1-dash/telemetry-core';
 
 interface SafetyCarMomentaryOverlayProps {
   onDismiss: () => void;

@@ -1,9 +1,16 @@
-import { CockpitTelemetryState, INITIAL_TELEMETRY_STATE } from '../core/state/telemetry-state';
-import { TelemetryStore } from '../core/state/telemetry-store';
+import {
+  CockpitTelemetryState,
+  INITIAL_COCKPIT_TELEMETRY_STATE,
+  TelemetryStore,
+  toCockpitTelemetryState,
+  ERSDeployMode,
+  VisualTyreCompound,
+  SafetyCarStatus,
+  Weather,
+  PitStatus
+} from '@f1-dash/telemetry-core';
+import Constants from 'expo-constants';
 import { nativeUdpReceiver, isRunningInExpoGo } from './native-udp-receiver';
-import { ERSDeployMode, VisualTyreCompound } from '../core/models/car-status';
-import { SafetyCarStatus, Weather } from '../core/models/session';
-import { PitStatus } from '../core/models/lap-data';
 
 export type TelemetryCallback = (state: CockpitTelemetryState) => void;
 
@@ -18,28 +25,33 @@ export type MomentaryEventType =
   | 'CAR_DAMAGE'
   | 'CHEQUERED_FLAG';
 
+export const getInitialServerHost = (): string => {
+  try {
+    const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
+    if (hostUri) {
+      const ip = hostUri.split(':')[0];
+      if (ip) return `${ip}:5173`;
+    }
+  } catch {}
+  return '172.20.10.6:5173';
+};
+
 class TelemetryService {
   private ws: WebSocket | null = null;
   private listeners: Set<TelemetryCallback> = new Set();
   private momentaryListeners: Set<(type: MomentaryEventType) => void> = new Set();
-  private currentState: CockpitTelemetryState = { ...INITIAL_TELEMETRY_STATE };
+  private currentState: CockpitTelemetryState = { ...INITIAL_COCKPIT_TELEMETRY_STATE };
   private mockInterval: any = null;
-  private serverHost: string = '192.168.1.107:5173';
+  private serverHost: string = getInitialServerHost();
   private mode: ConnectionMode = isRunningInExpoGo() ? 'MOCK' : 'UDP_NATIVE';
   private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
 
   constructor() {
     const store = TelemetryStore.getInstance();
-    this.storeUnsub = store.subscribe((storeState) => {
-      if (this.mode === 'UDP_NATIVE' && storeState.connected) {
-        this.currentState = {
-          ...storeState,
-          floorDamage: storeState.floorDamage ?? 0,
-          diffuserDamage: storeState.diffuserDamage ?? 0,
-          sidepodDamage: storeState.sidepodDamage ?? 0,
-          gearBoxDamage: storeState.gearBoxDamage ?? 0
-        };
+    this.storeUnsub = store.subscribe((raceState) => {
+      if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
+        this.currentState = toCockpitTelemetryState(raceState);
         this.notify();
       }
     });
@@ -129,7 +141,7 @@ class TelemetryService {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          this.currentState = { ...this.currentState, ...data, connected: true };
+          this.currentState = { ...this.currentState, ...data };
           this.notify();
         } catch {}
       };
@@ -263,6 +275,12 @@ class TelemetryService {
       pitLimiterActive: false,
       drsActive: false,
       drsAllowed: false,
+      activeAeroMode: 0,
+      activeAeroAvailable: false,
+      activeAeroActivationDistance: 0,
+      overtakeActive: false,
+      overtakeAvailable: false,
+      overtakeActivationDistance: 0,
       ersDeployMode: ERSDeployMode.Medium,
       weather: Weather.Clear,
       visualTyreCompound: VisualTyreCompound.F1_Hard,
@@ -289,7 +307,7 @@ class TelemetryService {
           ...this.currentState,
           ...baseReset,
           safetyCarStatus: SafetyCarStatus.Virtual,
-          safetyCarDelta: -0.421,
+          safetyCarDelta: 8.214,
         };
         break;
       case 'RED_FLAG':
@@ -303,7 +321,7 @@ class TelemetryService {
         this.currentState = {
           ...this.currentState,
           ...baseReset,
-          pitStatus: PitStatus.InPitArea,
+          pitStatus: PitStatus.Pitting,
           pitLimiterActive: true,
           pitSpeedLimit: 80,
           speed: 78,
@@ -315,6 +333,9 @@ class TelemetryService {
           ...this.currentState,
           ...baseReset,
           ersDeployMode: ERSDeployMode.Overtake,
+          overtakeActive: true,
+          overtakeAvailable: true,
+          overtakeActivationDistance: 0,
         };
         break;
       case 'DRS':
@@ -323,6 +344,9 @@ class TelemetryService {
           ...baseReset,
           drsActive: true,
           drsAllowed: true,
+          activeAeroMode: 1,
+          activeAeroAvailable: true,
+          activeAeroActivationDistance: 0,
         };
         break;
       case 'DAMAGE':

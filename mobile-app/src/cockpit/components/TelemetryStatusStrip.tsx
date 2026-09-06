@@ -7,7 +7,7 @@
 
 import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Weather } from '../../core/models/session';
+import { Weather } from '@f1-dash/telemetry-core';
 import { CockpitTheme } from '../theme/types';
 
 interface TelemetryStatusStripProps {

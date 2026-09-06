@@ -1,0 +1,21 @@
+{
+  "name": "@f1-dash/telemetry-core",
+  "version": "1.0.0",
+  "description": "Universal F1 25 / F1 26 UDP Telemetry Core (Parsers, Normalization, Derived Calculations and Events)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "f1",
+    "telemetry",
+    "udp",
+    "parser",
+    "f1-25",
+    "f1-26"
+  ],
+  "author": "",
+  "license": "ISC"
+}

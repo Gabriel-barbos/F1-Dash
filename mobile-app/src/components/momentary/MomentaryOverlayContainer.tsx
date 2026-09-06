@@ -92,7 +92,11 @@ export const MomentaryOverlayContainer: React.FC<MomentaryOverlayContainerProps>
 
 const styles = StyleSheet.create({
   overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(5, 7, 12, 0.96)',
     zIndex: 9999,
     justifyContent: 'space-between',

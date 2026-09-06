@@ -1,5 +1,5 @@
 import { RemoteInfo } from 'node:dgram';
-import { PacketId } from '../models/packet-ids.js';
+import { PacketId } from '@f1-dash/telemetry-core';
 
 export interface ReceiverConfig {
   port: number;
@@ -11,7 +11,7 @@ export interface ReceiverStats {
   totalBytes: number;
   packetsPerSecond: number;
   bytesPerSecond: number;
-  packetCountByType: Partial<Record<PacketId, number>>;
+  packetCountByType: Partial<Record<PacketId | string, number>>;
   lastPacketTime: Date | null;
   remoteInfo: RemoteInfo | null;
 }

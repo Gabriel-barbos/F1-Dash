@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { PitStatus } from '../core/models/lap-data';
-import { Formatters } from '../core/utils/formatters';
+import { PitStatus, Formatters } from '@f1-dash/telemetry-core';
 
 interface PitStatusCardProps {
   pitStatus: PitStatus;

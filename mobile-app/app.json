@@ -32,7 +32,13 @@
         {
           "multicast": true
         }
-      ]
-    ]
+      ],
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ac6fa48a-6a31-442b-b5cb-431d7bf915ed"
+      }
+    }
   }
 }

@@ -9,27 +9,27 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~6.1.2",
+    "@expo/metro-runtime": "~57.0.15",
     "@isvend/expo-udp": "^0.1.0",
-    "expo": "~54.0.0",
-    "expo-asset": "~12.0.13",
-    "expo-linear-gradient": "~15.0.8",
-    "expo-navigation-bar": "~5.0.10",
+    "expo": "^57.0.0",
+    "expo-asset": "~57.0.16",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-navigation-bar": "~57.0.2",
     "expo-network": "^57.0.1",
-    "expo-status-bar": "~3.0.9",
+    "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^0.475.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-safe-area-context": "^5.9.1",
-    "react-native-svg": "15.12.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
     "react-native-udp": "^4.1.7",
     "react-native-web": "~0.21.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "@types/react": "~19.1.10",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.2.4",
+    "typescript": "~6.0.3"
   },
   "private": true
 }

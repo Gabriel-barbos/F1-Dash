@@ -1,10 +1,13 @@
-import { TelemetryNetworkReceiver } from '../src/core/network/udp-receiver';
-import { TelemetryStore } from '../src/core/state/telemetry-store';
+import { UdpReceiver } from '../src/udp/receiver';
+import { TelemetryStore } from '@f1-dash/telemetry-core';
 import { spawn } from 'node:child_process';
 
 async function main() {
   const store = TelemetryStore.getInstance();
-  const receiver = new TelemetryNetworkReceiver({ port: 20777 });
+  const receiver = new UdpReceiver({ port: 20777 });
+  receiver.on('packet', (parsed) => {
+    store.processPacket(parsed);
+  });
   await receiver.start();
 
   console.log('🚀 [Verify Pipeline] Receiver UDP iniciado na porta 20777.');
@@ -16,7 +19,7 @@ async function main() {
 
   let checks = 0;
   const interval = setInterval(() => {
-    const s = store.getState();
+    const s = store.getCockpitState();
     console.log(
       `📊 [LIVE TELEMETRY] Conectado: ${s.connected ? 'SIM' : 'NÃO'} (${s.packetsPerSecond} Hz) | ` +
       `Velocidade: ${s.speed} km/h | Marcha: ${s.gear} | RPM: ${s.engineRPM} | ` +

@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from 'react';
-import { CockpitTelemetryState } from '../../core/state/telemetry-state';
+import { CockpitTelemetryState } from '@f1-dash/telemetry-core';
 import { CockpitTheme } from './types';
 import { getCockpitTheme } from './getCockpitTheme';
 
@@ -38,6 +38,10 @@ export function useCockpitTheme(telemetry: CockpitTelemetryState): CockpitTheme 
       telemetry.weather,
       telemetry.lastLapTimeInMS,
       telemetry.bestLapTimeInMS,
+      telemetry.overtakeActive,
+      telemetry.overtakeAvailable,
+      telemetry.activeAeroMode,
+      telemetry.activeAeroAvailable,
     ]
   );
 }

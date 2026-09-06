@@ -1,9 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { HeaderParser } from '../src/core/parser/header-parser';
-import { TelemetryParser } from '../src/core/parser/telemetry-parser';
-import { ParserRegistry } from '../src/core/parser/parser-registry';
-import { PacketId } from '../src/core/models/packet-ids';
+import {
+  HeaderParser,
+  TelemetryParser,
+  ParserRegistry,
+  PacketId
+} from '@f1-dash/telemetry-core';
 
 describe('HeaderParser', () => {
   test('deve decodificar corretamente os 29 bytes do Header', () => {
@@ -41,7 +43,7 @@ describe('HeaderParser', () => {
     const shortBuffer = Buffer.alloc(20);
     assert.throws(() => {
       HeaderParser.parse(shortBuffer);
-    }, /Tamanho de buffer inválido para Header/);
+    }, /Tamanho de buffer (inválido|insuficiente) para Header/);
   });
 
   test('peekPacketId deve retornar o PacketId correto', () => {

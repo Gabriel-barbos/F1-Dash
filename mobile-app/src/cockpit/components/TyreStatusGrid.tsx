@@ -7,7 +7,7 @@
 
 import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { VisualTyreCompound } from '../../core/models/car-status';
+import { VisualTyreCompound } from '@f1-dash/telemetry-core';
 import { CockpitTheme } from '../theme/types';
 
 interface TyreStatusGridProps {
@@ -21,31 +21,33 @@ interface TyreStatusGridProps {
 
 interface CompoundConfig {
   letter: string;
-  color: string;
   name: string;
+  color: string;
 }
 
 function getCompoundConfig(compound: VisualTyreCompound): CompoundConfig {
   switch (compound) {
     case VisualTyreCompound.F1_Soft:
-      return { letter: 'S', color: '#ef4444', name: 'SOFT' };
+      return { letter: 'S', name: 'SOFT', color: '#ef4444' };
     case VisualTyreCompound.F1_Medium:
-      return { letter: 'M', color: '#eab308', name: 'MEDIUM' };
-    case VisualTyreCompound.F1_Inter:
-      return { letter: 'I', color: '#22c55e', name: 'INTER' };
-    case VisualTyreCompound.F1_Wet:
-      return { letter: 'W', color: '#3b82f6', name: 'WET' };
+      return { letter: 'M', name: 'MED', color: '#eab308' };
     case VisualTyreCompound.F1_Hard:
+      return { letter: 'H', name: 'HARD', color: '#ffffff' };
+    case VisualTyreCompound.F1_Intermediate:
+      return { letter: 'I', name: 'INTER', color: '#22c55e' };
+    case VisualTyreCompound.F1_Wet:
+      return { letter: 'W', name: 'WET', color: '#3b82f6' };
     default:
-      return { letter: 'H', color: '#ffffff', name: 'HARD' };
+      return { letter: '?', name: 'PNEU', color: '#6b7280' };
   }
 }
 
 function getTempColor(temp: number): string {
-  if (temp < 80) return '#38bdf8';   // Frio
-  if (temp <= 104) return '#22c55e'; // Ótimo
-  if (temp <= 114) return '#f59e0b'; // Quente
-  return '#ef4444';                  // Superaquecido
+  if (temp <= 0) return '#6b7280';
+  if (temp < 80) return '#3b82f6';   // Frio (Azul)
+  if (temp <= 105) return '#22c55e'; // Ótimo (Verde)
+  if (temp <= 115) return '#eab308'; // Atenção (Amarelo)
+  return '#ef4444';                  // Superaquecido (Vermelho)
 }
 
 interface SingleTyreProps {
@@ -56,7 +58,8 @@ interface SingleTyreProps {
 }
 
 const SingleTyre: React.FC<SingleTyreProps> = memo(({ pos, temp, psi, wearPct }) => {
-  const tempColor = getTempColor(temp);
+  const isAvailable = temp > 0 || psi > 0;
+  const tempColor = isAvailable ? getTempColor(temp) : '#6b7280';
   const roundedWear = Math.min(100, Math.max(0, Math.round(wearPct || 0)));
   const lifeRemaining = Math.max(0, 10 - Math.floor(roundedWear / 10));
 
@@ -64,14 +67,16 @@ const SingleTyre: React.FC<SingleTyreProps> = memo(({ pos, temp, psi, wearPct })
     <View style={styles.tyreCard}>
       <View style={styles.tyreHeader}>
         <Text style={styles.tyrePos}>{pos}</Text>
-        <Text style={styles.tyreLife}>{lifeRemaining}/10</Text>
+        <Text style={styles.tyreLife}>{isAvailable ? `${lifeRemaining}/10` : '--'}</Text>
       </View>
 
-      <Text style={[styles.tyreTemp, { color: tempColor }]}>{Math.round(temp || 0)}°C</Text>
+      <Text style={[styles.tyreTemp, { color: tempColor }]}>
+        {isAvailable ? `${Math.round(temp)}°C` : '--'}
+      </Text>
 
       <View style={styles.tyreFooter}>
-        <Text style={styles.tyrePsi}>{psi ? psi.toFixed(1) : '23.5'} PSI</Text>
-        <Text style={styles.tyreWearPct}>{roundedWear}% desg</Text>
+        <Text style={styles.tyrePsi}>{psi > 0 ? `${psi.toFixed(1)} PSI` : '-- PSI'}</Text>
+        <Text style={styles.tyreWearPct}>{isAvailable ? `${roundedWear}% desg` : '--'}</Text>
       </View>
     </View>
   );
@@ -99,7 +104,7 @@ export const TyreStatusGrid: React.FC<TyreStatusGridProps> = memo(({
         <View style={[styles.compoundPill, { borderColor: config.color }]}>
           <Text style={[styles.compoundLetter, { color: config.color }]}>{config.letter}</Text>
           <Text style={[styles.compoundName, { color: config.color }]}>{config.name}</Text>
-          <Text style={styles.ageLaps}>({tyresAgeLaps || 1}V)</Text>
+          <Text style={styles.ageLaps}>({tyresAgeLaps}V)</Text>
         </View>
       </View>
 
@@ -108,30 +113,30 @@ export const TyreStatusGrid: React.FC<TyreStatusGridProps> = memo(({
         <View style={styles.gridRow}>
           <SingleTyre
             pos="DE (FL)"
-            temp={surfaceTemps[2] || 98}
-            psi={pressures[2] || 23.8}
-            wearPct={wear[2] || 18}
+            temp={surfaceTemps[2] ?? 0}
+            psi={pressures[2] ?? 0}
+            wearPct={wear[2] ?? 0}
           />
           <SingleTyre
             pos="DD (FR)"
-            temp={surfaceTemps[3] || 99}
-            psi={pressures[3] || 23.9}
-            wearPct={wear[3] || 21}
+            temp={surfaceTemps[3] ?? 0}
+            psi={pressures[3] ?? 0}
+            wearPct={wear[3] ?? 0}
           />
         </View>
 
         <View style={styles.gridRow}>
           <SingleTyre
             pos="TE (RL)"
-            temp={surfaceTemps[0] || 102}
-            psi={pressures[0] || 24.1}
-            wearPct={wear[0] || 25}
+            temp={surfaceTemps[0] ?? 0}
+            psi={pressures[0] ?? 0}
+            wearPct={wear[0] ?? 0}
           />
           <SingleTyre
             pos="TD (RR)"
-            temp={surfaceTemps[1] || 101}
-            psi={pressures[1] || 24.0}
-            wearPct={wear[1] || 23}
+            temp={surfaceTemps[1] ?? 0}
+            psi={pressures[1] ?? 0}
+            wearPct={wear[1] ?? 0}
           />
         </View>
       </View>

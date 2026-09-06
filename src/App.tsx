@@ -1,20 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { CockpitTelemetryState, TelemetryStore } from './core/state/telemetry-store';
-import { SafetyCarStatus, Weather } from './core/models/session';
-import { PitStatus } from './core/models/lap-data';
-import { VehicleFiaFlag, ERSDeployMode, VisualTyreCompound } from './core/models/car-status';
-import { Formatters } from './core/utils/formatters';
+import {
+  CockpitTelemetryState,
+  INITIAL_COCKPIT_TELEMETRY_STATE,
+  TelemetryStore,
+  toCockpitTelemetryState,
+  SafetyCarStatus,
+  Weather,
+  PitStatus,
+  VehicleFiaFlag,
+  ERSDeployMode,
+  VisualTyreCompound,
+  Formatters
+} from '@f1-dash/telemetry-core';
+import { CarDamageMap } from './components/CarDamageMap';
 
 export const App: React.FC = () => {
   const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(
-    TelemetryStore.getInstance().getState()
+    TelemetryStore.getInstance().getCockpitState()
   );
   const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
     // 1. Ouvir store local
     const unsub = TelemetryStore.getInstance().subscribe((state) => {
-      setTelemetry({ ...state });
+      setTelemetry(toCockpitTelemetryState(state));
     });
 
     // 2. Conectar ao WebSocket do servidor para receber do PC no celular
@@ -60,7 +69,6 @@ export const App: React.FC = () => {
   const scInfo = Formatters.getSafetyCarInfo(telemetry.safetyCarStatus);
   const flagInfo = Formatters.getFiaFlagInfo(telemetry.vehicleFiaFlags);
   const pitInfo = Formatters.getPitStatusLabel(telemetry.pitStatus, telemetry.pitLimiterActive);
-  const compoundInfo = Formatters.getTyreCompoundInfo(telemetry.visualTyreCompound);
   const ersMode = Formatters.getErsModeName(telemetry.ersDeployMode);
 
   const gearDisplay = telemetry.gear === 0 ? 'N' : telemetry.gear === -1 ? 'R' : telemetry.gear.toString();
@@ -191,14 +199,41 @@ export const App: React.FC = () => {
 
         {/* Coluna Central: Marcha, Velocidade & DRS */}
         <section style={styles.centerCard}>
-          <div
-            style={{
-              ...styles.drsBadge,
-              backgroundColor: telemetry.drsActive ? '#22c55e' : telemetry.drsAllowed ? '#3b82f6' : '#27272a',
-              color: telemetry.drsActive || telemetry.drsAllowed ? '#000' : '#71717a'
-            }}
-          >
-            DRS {telemetry.drsActive ? 'ACTIVE' : telemetry.drsAllowed ? 'READY' : 'OFF'}
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                ...styles.drsBadge,
+                backgroundColor: telemetry.drsActive ? '#22c55e' : telemetry.drsAllowed ? '#3b82f6' : '#27272a',
+                color: telemetry.drsActive || telemetry.drsAllowed ? '#000' : '#71717a'
+              }}
+            >
+              DRS {telemetry.drsActive ? 'ACTIVE' : telemetry.drsAllowed ? 'READY' : 'OFF'}
+            </div>
+
+            {telemetry.activeAeroAvailable && (
+              <div
+                style={{
+                  ...styles.drsBadge,
+                  backgroundColor: telemetry.activeAeroMode === 1 ? '#a855f7' : '#0ea5e9',
+                  color: '#fff'
+                }}
+              >
+                {telemetry.activeAeroMode === 1 ? 'MODO X (RETA)' : 'MODO Z (CURVA)'}
+              </div>
+            )}
+
+            {telemetry.overtakeActive && (
+              <div
+                style={{
+                  ...styles.drsBadge,
+                  backgroundColor: '#f59e0b',
+                  color: '#000',
+                  fontWeight: 900
+                }}
+              >
+                ⚡ BOOST 2026
+              </div>
+            )}
           </div>
 
           <div style={styles.gearDisplay}>{gearDisplay}</div>
@@ -248,57 +283,44 @@ export const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Setores (incluindo Setor 3 derivado) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '4px 6px', backgroundColor: '#18181b', borderRadius: 4, fontSize: 11, color: '#94a3b8' }}>
+            <span>S1: <strong style={{ color: '#fff' }}>{Formatters.formatLapTime(telemetry.sector1TimeInMS)}</strong></span>
+            <span>S2: <strong style={{ color: '#fff' }}>{Formatters.formatLapTime(telemetry.sector2TimeInMS)}</strong></span>
+            <span>S3: <strong style={{ color: '#38bdf8' }}>{Formatters.formatLapTime(telemetry.sector3TimeInMS)}</strong></span>
+          </div>
+
           <div style={styles.deltaBox}>
             <div>FRENTE: {Formatters.formatDelta(telemetry.deltaToCarInFrontInMS)}</div>
             <div>LÍDER: {Formatters.formatDelta(telemetry.deltaToRaceLeaderInMS)}</div>
           </div>
+
+
         </section>
       </main>
 
       {/* 5. Linha Inferior: 4 Pneus & Pedais */}
       <footer style={styles.bottomFooter}>
-        {/* Pneus */}
-        <div style={styles.tyreCard}>
-          <div style={styles.tyreHeader}>
-            <span
-              style={{
-                ...styles.tyreBadge,
-                backgroundColor: compoundInfo.color,
-                color: compoundInfo.textColor
-              }}
-            >
-              {compoundInfo.short}
-            </span>
-            <span style={styles.tyreCompoundName}>
-              {compoundInfo.name} ({telemetry.tyresAgeLaps}V)
-            </span>
-          </div>
-
-          <div style={styles.tyreGrid}>
-            {[
-              { label: 'FL', idx: 2 },
-              { label: 'FR', idx: 3 },
-              { label: 'RL', idx: 0 },
-              { label: 'RR', idx: 1 }
-            ].map(({ label, idx }) => {
-              const wear = telemetry.tyresWear[idx] || 0;
-              const temp = telemetry.tyresSurfaceTemperature[idx] || 0;
-              const psi = telemetry.tyresPressure[idx] ? telemetry.tyresPressure[idx].toFixed(1) : '22.5';
-              let wearColor = '#22c55e';
-              if (wear > 50) wearColor = '#ef4444';
-              else if (wear > 25) wearColor = '#eab308';
-
-              return (
-                <div key={label} style={styles.tyreCell}>
-                  <div style={styles.tyreLabel}>{label}</div>
-                  <div style={{ ...styles.tyreWear, color: wearColor }}>{wear.toFixed(0)}%</div>
-                  <div style={styles.tyreSub}>{temp}°C</div>
-                  <div style={styles.tyreSub}>{psi} psi</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Mapa Visual de Danos + Pneus */}
+        <CarDamageMap
+          frontLeftWingDamage={telemetry.frontLeftWingDamage}
+          frontRightWingDamage={telemetry.frontRightWingDamage}
+          rearWingDamage={telemetry.rearWingDamage}
+          floorDamage={telemetry.floorDamage}
+          diffuserDamage={telemetry.diffuserDamage}
+          sidepodDamage={telemetry.sidepodDamage}
+          gearBoxDamage={telemetry.gearBoxDamage}
+          engineDamage={telemetry.engineDamage}
+          tyresWear={telemetry.tyresWear}
+          tyresDamage={telemetry.tyresDamage}
+          tyresSurfaceTemp={telemetry.tyresSurfaceTemperature}
+          tyresPressure={telemetry.tyresPressure}
+          brakesTemperature={telemetry.brakesTemperature}
+          compound={telemetry.visualTyreCompound}
+          tyresAgeLaps={telemetry.tyresAgeLaps}
+          drsFault={telemetry.drsFault}
+          engineBlown={telemetry.engineBlown}
+        />
 
         {/* Pedais de Acelerador e Freio */}
         <div style={styles.pedalsContainer}>
@@ -602,58 +624,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'center',
     gap: '24px'
-  },
-  tyreCard: {
-    backgroundColor: '#09090b',
-    borderRadius: '12px',
-    border: '1px solid #27272a',
-    padding: '8px 16px'
-  },
-  tyreHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '6px'
-  },
-  tyreBadge: {
-    width: '20px',
-    height: '20px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '11px',
-    fontWeight: 900
-  },
-  tyreCompoundName: {
-    color: '#e4e4e7',
-    fontSize: '12px',
-    fontWeight: 700
-  },
-  tyreGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '6px'
-  },
-  tyreCell: {
-    backgroundColor: '#18181b',
-    borderRadius: '6px',
-    padding: '4px 10px',
-    textAlign: 'center',
-    minWidth: '70px'
-  },
-  tyreLabel: {
-    color: '#71717a',
-    fontSize: '10px',
-    fontWeight: 700
-  },
-  tyreWear: {
-    fontSize: '13px',
-    fontWeight: 800
-  },
-  tyreSub: {
-    color: '#a1a1aa',
-    fontSize: '9px'
   },
   pedalsContainer: {
     display: 'flex',

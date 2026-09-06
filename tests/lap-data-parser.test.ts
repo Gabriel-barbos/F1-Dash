@@ -1,8 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { LapDataParser } from '../src/core/parser/lap-data-parser';
-import { PacketId } from '../src/core/models/packet-ids';
-import { PitStatus, DriverStatus } from '../src/core/models/lap-data';
+import {
+  LapDataParser,
+  PacketId,
+  PitStatus,
+  DriverStatus
+} from '@f1-dash/telemetry-core';
 
 describe('LapDataParser (Packet ID 2)', () => {
   test('deve decodificar tempos de volta, setores e status de Box', () => {

@@ -1,6 +1,6 @@
 import { UdpReceiver } from './udp/receiver.js';
 import { config, getLocalIPv4Addresses } from './config.js';
-import { PacketId, PACKET_NAMES } from './models/packet-ids.js';
+import { PacketId, PACKET_NAMES } from '@f1-dash/telemetry-core';
 import { telemetryStore } from './state/telemetry-store.js';
 import { TelemetryWebServer } from './server/web-server.js';
 import {

@@ -18,12 +18,13 @@ export class CarDamageParser {
     const carDamageData: CarDamageData[] = [];
 
     const payloadLength = reader.remainingBytes();
-    const detectedEntrySize = Math.max(40, Math.floor(payloadLength / numCars));
+    const detectedEntrySize = Math.max(38, Math.floor(payloadLength / numCars));
+    const hasTyreBlisters = detectedEntrySize >= 46 || header.packetFormat >= 2024 || header.gameYear >= 24;
 
     for (let i = 0; i < numCars; i++) {
       if (!reader.hasRemaining(36)) break;
       const startOffset = reader.getOffset();
-      const damageEntry = CarDamageParser.parseCarDamageEntry(reader);
+      const damageEntry = CarDamageParser.parseCarDamageEntry(reader, hasTyreBlisters);
       carDamageData.push(damageEntry);
 
       const bytesRead = reader.getOffset() - startOffset;
@@ -45,7 +46,7 @@ export class CarDamageParser {
     };
   }
 
-  public static parseCarDamageEntry(reader: BinaryReader): CarDamageData {
+  public static parseCarDamageEntry(reader: BinaryReader, hasTyreBlisters = false): CarDamageData {
     const tyresWear: [number, number, number, number] = [
       reader.readFloatLE(),
       reader.readFloatLE(),
@@ -66,6 +67,10 @@ export class CarDamageParser {
       reader.readUInt8(),
       reader.readUInt8()
     ];
+
+    if (hasTyreBlisters && reader.hasRemaining(4)) {
+      reader.skip(4);
+    }
 
     const frontLeftWingDamage = reader.readUInt8();
     const frontRightWingDamage = reader.readUInt8();

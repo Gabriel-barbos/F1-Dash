@@ -18,7 +18,8 @@ export enum PacketId {
   TyreSets = 12,            // Conjuntos de pneus disponíveis e usados na sessão
   MotionEx = 13,            // Dados extras de movimento (rodas, suspensão)
   TimeTrial = 14,           // Dados específicos do modo Tomada de Tempo
-  CarTelemetry2 = 15        // Regulamento 2026: Active Aero (Modo Reta/Curva) e Overtake/Boost
+  LapPositions = 15,        // Posições volta a volta de todos os carros (1231 bytes)
+  CarTelemetry2 = 16        // Regulamento 2026: Active Aero (Modo Reta/Curva) e Overtake (269 bytes)
 }
 
 export const PACKET_NAMES: Record<PacketId, string> = {

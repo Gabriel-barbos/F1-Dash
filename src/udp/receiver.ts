@@ -1,8 +1,7 @@
 import dgram, { Socket, RemoteInfo } from 'node:dgram';
 import { EventEmitter } from 'node:events';
 import { ReceiverConfig, ReceiverStats } from './types.js';
-import { ParserRegistry, ParsedPacket } from '../parser/parser-registry.js';
-import { PacketId } from '../models/packet-ids.js';
+import { ParserRegistry, ParsedPacket, PacketId } from '../../packages/telemetry-core/src/index.js';
 
 export class UdpReceiver extends EventEmitter {
   private socket: Socket | null = null;
@@ -102,7 +101,8 @@ export class UdpReceiver extends EventEmitter {
 
     this.emit('raw', msg, rinfo);
 
-    const parsed = ParserRegistry.parse(msg);
+    const uint8 = new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength);
+    const parsed = ParserRegistry.parse(uint8);
     if (parsed) {
       const type = parsed.type;
       this.stats.packetCountByType[type] = (this.stats.packetCountByType[type] ?? 0) + 1;

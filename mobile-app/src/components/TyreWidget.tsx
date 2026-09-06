@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { VisualTyreCompound } from '../core/models/car-status';
+import { VisualTyreCompound } from '@f1-dash/telemetry-core';
 
 interface TyreWidgetProps {
   compound: VisualTyreCompound;

@@ -1,8 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { CarStatusParser } from '../src/core/parser/car-status-parser';
-import { PacketId } from '../src/core/models/packet-ids';
-import { VehicleFiaFlag, ERSDeployMode, VisualTyreCompound } from '../src/core/models/car-status';
+import {
+  CarStatusParser,
+  PacketId,
+  VehicleFiaFlag,
+  ERSDeployMode,
+  VisualTyreCompound
+} from '@f1-dash/telemetry-core';
 
 describe('CarStatusParser (Packet ID 7)', () => {
   test('deve decodificar ERS, Bandeiras FIA e Pit Limiter', () => {

@@ -1,6 +1,5 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { ParserRegistry } from '../core/parser/parser-registry';
-import { TelemetryStore } from '../core/state/telemetry-store';
+import { ParserRegistry, TelemetryStore } from '@f1-dash/telemetry-core';
 
 export const isRunningInExpoGo = (): boolean => {
   return (

@@ -1,8 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { SessionParser } from '../src/core/parser/session-parser';
-import { PacketId } from '../src/core/models/packet-ids';
-import { SafetyCarStatus, Weather, SessionType } from '../src/core/models/session';
+import {
+  SessionParser,
+  PacketId,
+  SafetyCarStatus,
+  Weather,
+  SessionType
+} from '@f1-dash/telemetry-core';
 
 describe('SessionParser (Packet ID 1)', () => {
   test('deve decodificar corretamente status de Safety Car e Clima', () => {

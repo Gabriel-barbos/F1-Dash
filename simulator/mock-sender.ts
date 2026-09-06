@@ -1,8 +1,16 @@
 import dgram from 'node:dgram';
-import { PacketId } from '../src/core/models/packet-ids';
-import { SafetyCarStatus, Weather, SessionType } from '../src/core/models/session';
-import { PitStatus, DriverStatus, ResultStatus } from '../src/core/models/lap-data';
-import { ERSDeployMode, VisualTyreCompound, VehicleFiaFlag } from '../src/core/models/car-status';
+import {
+  PacketId,
+  SafetyCarStatus,
+  Weather,
+  SessionType,
+  PitStatus,
+  DriverStatus,
+  ResultStatus,
+  ERSDeployMode,
+  VisualTyreCompound,
+  VehicleFiaFlag
+} from '@f1-dash/telemetry-core';
 
 const TARGET_PORT = Number(process.env.F1_UDP_PORT || 20777);
 const TARGET_HOST = process.env.F1_UDP_HOST || '127.0.0.1';
@@ -229,6 +237,52 @@ function createDamagePacket(): Buffer {
   return buffer;
 }
 
+// 6. GERAÇÃO DE CAR TELEMETRY 2 (ID 16 - Regulamento 2026 Active Aero & Overtake 1s)
+function createTelemetry2Packet(): Buffer {
+  const buffer = Buffer.alloc(29 + 24 * 10); // Exatos 269 bytes
+  writeHeader(buffer, PacketId.CarTelemetry2);
+
+  const isStraight = gear >= 7 && speed > 260;
+  const isApproachingStraight = gear >= 5 && speed > 200 && !isStraight;
+  // Simula perseguição a rival (< 1s atrás): Overtake disponível na aproximação da reta e ativo na reta acima de 280
+  const isCloseToRival = (frameId % 600) < 400; // 66% do tempo em disputa de ultrapassagem
+
+  for (let i = 0; i < 24; i++) {
+    const offset = 29 + (i * 10);
+
+    if (i === 0) {
+      // Carro do Jogador
+      const aeroMode = isStraight ? 1 : 0;
+      const aeroAvail = isStraight || isApproachingStraight ? 1 : 0;
+      const aeroDist = isApproachingStraight ? Math.max(10, Math.round(260 - speed)) : 0;
+      const ovtkAvail = isCloseToRival && (isStraight || isApproachingStraight) ? 1 : 0;
+      const ovtkActive = ovtkAvail && isStraight && speed > 285 ? 1 : 0;
+      const ovtkDist = isApproachingStraight ? Math.max(15, Math.round(270 - speed)) : 0;
+
+      buffer.writeUInt8(aeroMode, offset + 0);               // activeAeroMode (0=Z/Curva, 1=X/Reta)
+      buffer.writeUInt8(aeroAvail, offset + 1);              // activeAeroAvailable
+      buffer.writeUInt16LE(aeroDist, offset + 2);            // activeAeroActivationDistance
+      buffer.writeUInt8(ovtkAvail, offset + 4);              // overtakeAvailable (< 1s do rival)
+      buffer.writeUInt8(ovtkActive, offset + 5);             // overtakeActive (potência extra)
+      buffer.writeUInt16LE(ovtkDist, offset + 6);            // overtakeActivationDistance
+      buffer.writeUInt8(1, offset + 8);                      // is2026Regulations (1 = Regulamento 2026)
+      buffer.writeUInt8(0, offset + 9);                      // drivingWrongWay
+    } else {
+      // Carros da IA
+      buffer.writeUInt8(isStraight ? 1 : 0, offset + 0);
+      buffer.writeUInt8(isStraight ? 1 : 0, offset + 1);
+      buffer.writeUInt16LE(0, offset + 2);
+      buffer.writeUInt8(0, offset + 4);
+      buffer.writeUInt8(0, offset + 5);
+      buffer.writeUInt16LE(0, offset + 6);
+      buffer.writeUInt8(1, offset + 8);
+      buffer.writeUInt8(0, offset + 9);
+    }
+  }
+
+  return buffer;
+}
+
 // Loop de simulação física (60Hz)
 setInterval(() => {
   frameId++;
@@ -291,8 +345,9 @@ setInterval(() => {
     }
   }
 
-  // Envia Telemetria (ID 6) a 60Hz
+  // Envia Telemetria (ID 6) e Car Telemetry 2 (ID 15 - 2026) a 60Hz
   client.send(createTelemetryPacket(), TARGET_PORT, TARGET_HOST);
+  client.send(createTelemetry2Packet(), TARGET_PORT, TARGET_HOST);
 }, 1000 / 60);
 
 // Envia Status & LapData a 20Hz

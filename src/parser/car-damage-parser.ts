@@ -17,13 +17,13 @@ export class CarDamageParser {
     const header = HeaderParser.parse(buffer);
     const reader = new BufferReader(buffer, 29);
 
-    const isFormat2026 = header.packetFormat === 2026;
-    const numCars = isFormat2026 ? 24 : 22;
-    const carDamageData: CarDamageData[] = [];
+    const payloadLength = reader.remainingBytes();
+    const detectedEntrySize = Math.max(38, Math.floor(payloadLength / numCars));
+    const hasTyreBlisters = detectedEntrySize >= 46 || header.packetFormat >= 2024 || header.gameYear >= 24;
 
     for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(40)) break;
-      const damageEntry = CarDamageParser.parseCarDamageEntry(reader);
+      if (!reader.hasRemaining(36)) break;
+      const damageEntry = CarDamageParser.parseCarDamageEntry(reader, hasTyreBlisters);
       carDamageData.push(damageEntry);
     }
 
@@ -40,7 +40,7 @@ export class CarDamageParser {
     };
   }
 
-  public static parseCarDamageEntry(reader: BufferReader): CarDamageData {
+  public static parseCarDamageEntry(reader: BufferReader, hasTyreBlisters = false): CarDamageData {
     // Array de 4 rodas: [0] RL, [1] RR, [2] FL, [3] FR
     const tyresWear = {
       rearLeft: reader.readFloatLE(),
@@ -62,6 +62,10 @@ export class CarDamageParser {
       frontLeft: reader.readUInt8(),
       frontRight: reader.readUInt8()
     };
+
+    if (hasTyreBlisters && reader.hasRemaining(4)) {
+      reader.skip(4);
+    }
 
     const frontLeftWingDamage = reader.readUInt8();
     const frontRightWingDamage = reader.readUInt8();

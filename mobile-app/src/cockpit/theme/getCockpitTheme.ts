@@ -8,10 +8,14 @@
  * Deve ser chamada com useMemo para evitar recálculo a cada frame de telemetria.
  */
 
-import { CockpitTelemetryState } from '../../core/state/telemetry-state';
-import { SafetyCarStatus, Weather, SessionType } from '../../core/models/session';
-import { PitStatus } from '../../core/models/lap-data';
-import { ERSDeployMode } from '../../core/models/car-status';
+import {
+  CockpitTelemetryState,
+  SafetyCarStatus,
+  Weather,
+  SessionType,
+  PitStatus,
+  ERSDeployMode
+} from '@f1-dash/telemetry-core';
 import { CockpitTheme, CockpitStateKey } from './types';
 import { COCKPIT_THEMES } from './cockpitThemes';
 
@@ -51,13 +55,13 @@ function determineCockpitState(state: CockpitTelemetryState): CockpitStateKey {
     return CockpitStateKey.PIT_LANE;
   }
 
-  // P6 — Modo Overtake (ERS Deploy Mode = Overtake)
-  if (state.ersDeployMode === ERSDeployMode.Overtake) {
+  // P6 — Modo Overtake (2026 Overtake ativo ou ERS Overtake em 2025)
+  if (state.is2026Regulations ? state.overtakeActive : state.ersDeployMode === ERSDeployMode.Overtake) {
     return CockpitStateKey.OVERTAKE;
   }
 
-  // P7 — Modo Reta (Asas móveis / DRS ativo na reta)
-  if (state.drsActive) {
+  // P7 — Modo Reta (2026 Straight Mode / X-Mode ativo ou DRS aberto em 2025)
+  if (state.is2026Regulations ? state.activeAeroMode === 1 : state.drsActive) {
     return CockpitStateKey.STRAIGHT_MODE;
   }
 
@@ -146,4 +150,9 @@ export const COCKPIT_THEME_DEPS = [
   'weather',
   'lastLapTimeInMS',
   'bestLapTimeInMS',
+  'overtakeActive',
+  'overtakeAvailable',
+  'activeAeroMode',
+  'activeAeroAvailable',
+  'is2026Regulations',
 ] as const satisfies ReadonlyArray<keyof CockpitTelemetryState>;

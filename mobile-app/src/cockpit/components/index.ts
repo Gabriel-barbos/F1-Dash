@@ -16,4 +16,5 @@ export { CarTopDownSvg } from './CarTopDownSvg';
 export { MiniGaugeBar } from './MiniGaugeBar';
 export { CarHeatmapCard } from './CarHeatmapCard';
 export { TyreStatusGrid } from './TyreStatusGrid';
+export { CarDamageMap } from './CarDamageMap';
 export { SessionFooter } from './SessionFooter';

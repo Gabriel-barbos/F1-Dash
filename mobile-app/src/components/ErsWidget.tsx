@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ERSDeployMode } from '../core/models/car-status';
+import { ERSDeployMode } from '@f1-dash/telemetry-core';
 
 interface ErsWidgetProps {
   batteryPercent: number;

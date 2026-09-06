@@ -45,14 +45,15 @@ export const TimingCard: React.FC<TimingCardProps> = memo(({
   lapInvalid,
   theme,
 }) => {
+  const hasDelta = deltaFrontMS !== 0 && !isNaN(deltaFrontMS);
   const isDeltaNegative = deltaFrontMS <= 0;
-  const deltaFormatted = (!deltaFrontMS || isNaN(deltaFrontMS))
-    ? '0.000'
+  const deltaFormatted = !hasDelta
+    ? '--'
     : deltaFrontMS > 0
     ? `+${(deltaFrontMS / 1000).toFixed(3)}`
     : `${(deltaFrontMS / 1000).toFixed(3)}`;
 
-  const deltaColor = isDeltaNegative ? '#22c55e' : '#ef4444';
+  const deltaColor = !hasDelta ? '#6b7280' : isDeltaNegative ? '#22c55e' : '#ef4444';
   const displayPosition = position > 0 && position <= 24 ? `P${position}` : 'P--';
 
   return (
@@ -61,7 +62,7 @@ export const TimingCard: React.FC<TimingCardProps> = memo(({
       <View style={styles.topRow}>
         <Text style={styles.positionText}>{displayPosition}</Text>
         <Text style={styles.lapText}>
-          LAP {currentLap || 1}/{totalLaps || 56}
+          LAP {currentLap > 0 ? currentLap : '--'}/{totalLaps > 0 ? totalLaps : '--'}
         </Text>
       </View>
 

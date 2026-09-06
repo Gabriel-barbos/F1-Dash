@@ -16,9 +16,10 @@ export default function App() {
     if (Platform.OS === 'android') {
       const applyCinemaMode = async () => {
         try {
-          await NavigationBar.setPositionAsync('absolute');
-          await NavigationBar.setVisibilityAsync('hidden');
-          await NavigationBar.setBehaviorAsync('overlay-swipe');
+          const nav = NavigationBar as any;
+          if (nav.setPositionAsync) await nav.setPositionAsync('absolute');
+          if (nav.setVisibilityAsync) await nav.setVisibilityAsync('hidden');
+          if (nav.setBehaviorAsync) await nav.setBehaviorAsync('overlay-swipe');
         } catch (err) {
           console.warn('[CinemaMode] Erro ao configurar barra imersiva do Android:', err);
         }

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { VehicleFiaFlag } from '../core/models/car-status';
-import { Formatters } from '../core/utils/formatters';
+import { VehicleFiaFlag, Formatters } from '@f1-dash/telemetry-core';
 
 interface FlagsBannerProps {
   flag: VehicleFiaFlag;

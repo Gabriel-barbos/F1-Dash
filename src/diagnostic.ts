@@ -1,5 +1,5 @@
 import dgram, { RemoteInfo } from 'node:dgram';
-import { PacketId, PACKET_NAMES } from './models/packet-ids.js';
+import { PacketId, PACKET_NAMES } from '@f1-dash/telemetry-core';
 import { config, getLocalIPv4Addresses } from './config.js';
 import { Colors } from './utils/formatters.js';
 

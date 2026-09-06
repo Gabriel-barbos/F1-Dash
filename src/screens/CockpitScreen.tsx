@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, SafeAreaView, ScrollView } from 'react-native';
-import { TelemetryStore, CockpitTelemetryState } from '../core/state/telemetry-store';
+import { TelemetryStore, CockpitTelemetryState, toCockpitTelemetryState } from '@f1-dash/telemetry-core';
 import { RevLights } from '../components/RevLights';
 import { GearDisplay } from '../components/GearDisplay';
 import { SafetyCarBanner } from '../components/SafetyCarBanner';
@@ -12,12 +12,12 @@ import { TimingWidget } from '../components/TimingWidget';
 
 export const CockpitScreen: React.FC = () => {
   const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(
-    TelemetryStore.getInstance().getState()
+    TelemetryStore.getInstance().getCockpitState()
   );
 
   useEffect(() => {
     const unsubscribe = TelemetryStore.getInstance().subscribe((newState) => {
-      setTelemetry({ ...newState });
+      setTelemetry(toCockpitTelemetryState(newState));
     });
     return () => unsubscribe();
   }, []);
