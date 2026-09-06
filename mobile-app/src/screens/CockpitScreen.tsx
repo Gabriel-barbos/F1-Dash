@@ -16,7 +16,7 @@ import {
   PitStatus,
   ERSDeployMode
 } from '@f1-dash/telemetry-core';
-import { telemetryService, ConnectionMode, MomentaryEventType } from '../services/telemetry-service';
+import { telemetryService, ConnectionMode, MomentaryEventType, MockScenario } from '../services/telemetry-service';
 
 import {
   useCockpitTheme,
@@ -27,9 +27,9 @@ import {
   TyreStatusGrid,
   CarDamageMap,
   SessionFooter,
+  CockpitAtmosphere,
+  ModeTransitionBar,
 } from '../cockpit';
-import { CockpitBackground } from '../cockpit/components/CockpitBackground';
-import { TelemetryInfoBar } from '../cockpit/components/TelemetryInfoBar';
 
 import { RaceStartOverlay } from '../components/momentary/RaceStartOverlay';
 import { CarDamageMomentaryOverlay } from '../components/momentary/CarDamageMomentaryOverlay';
@@ -50,6 +50,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const insets = useSafeAreaInsets();
   const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(INITIAL_COCKPIT_TELEMETRY_STATE);
   const [connMode, setConnMode] = useState<ConnectionMode>(telemetryService.getMode());
+  const [currentScenario, setCurrentScenario] = useState<MockScenario>(telemetryService.getCurrentScenario());
   const [activeMomentaryOverlay, setActiveMomentaryOverlay] = useState<MomentaryEventType | null>(
     initialMomentaryOverlay
   );
@@ -71,8 +72,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     const unsubscribe = telemetryService.subscribe((state) => {
       setTelemetry({ ...state });
 
-      // Detect Safety Car status transition
+      // Detect Safety Car status transition (apenas em jogo real para não bloquear a tela no mock)
       if (
+        connMode !== 'MOCK' &&
         (state.safetyCarStatus === SafetyCarStatus.Full || state.safetyCarStatus === SafetyCarStatus.Virtual) &&
         prevSafetyCar.current !== state.safetyCarStatus
       ) {
@@ -83,7 +85,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       prevSafetyCar.current = state.safetyCarStatus;
 
       // Detect Red Flag status transition
-      if (state.isRedFlagActive && !prevRedFlag.current) {
+      if (connMode !== 'MOCK' && state.isRedFlagActive && !prevRedFlag.current) {
         setActiveMomentaryOverlay('RED_FLAG');
       }
       prevRedFlag.current = !!state.isRedFlagActive;
@@ -97,7 +99,13 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       unsubscribe();
       unsubMomentary();
     };
-  }, []);
+  }, [connMode]);
+
+  const handleSelectScenario = (scenario: MockScenario) => {
+    setCurrentScenario(scenario);
+    setActiveMomentaryOverlay(null);
+    telemetryService.forceStateScenario(scenario);
+  };
 
   const handleConnectionPress = () => {
     // Reconecta o WebSocket e garante modo WEBSOCKET
@@ -119,7 +127,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     (telemetry.engineDamage ?? 0) > 20;
 
   return (
-    <CockpitBackground theme={theme}>
+    <CockpitAtmosphere theme={theme}>
       <View
         style={[
           styles.safeArea,
@@ -134,17 +142,20 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       >
         <StatusBar hidden />
         <View style={styles.container}>
-          {/* Header Superior: Barra de telemetria ocupando largura toda e botões flutuando */}
+          {/* Header Superior: Barra de transição de modo expansiva e botões flutuando */}
           <View style={styles.topHeader}>
-            <TelemetryInfoBar theme={theme} />
-
-            <View style={styles.headerRightGroup}>
-              {onNavigateToMenu && (
+            {onNavigateToMenu && (
+              <View style={styles.headerLeftGroup}>
                 <TouchableOpacity onPress={onNavigateToMenu} style={styles.pillBtn} activeOpacity={0.7}>
                   <Text style={styles.pillBtnIcon}>≡</Text>
                   <Text style={styles.pillBtnText}>MENU</Text>
                 </TouchableOpacity>
-              )}
+              </View>
+            )}
+
+            <ModeTransitionBar theme={theme} />
+
+            <View style={styles.headerRightGroup}>
               <TouchableOpacity
                 onPress={handleConnectionPress}
                 style={[
@@ -173,10 +184,10 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                 />
                 <Text style={styles.pillBtnText}>
                   {!telemetry.connected
-                    ? 'RECONECTAR PC'
+                    ? 'RECONECTAR'
                     : (telemetry.packetsPerSecond ?? 0) > 0
                     ? `ONLINE • ${telemetry.packetsPerSecond} HZ`
-                    : 'AGUARDANDO PISTA'}
+                    : 'AGUARDANDO'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -185,68 +196,46 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         {/* Mock Scenario Quick Bar */}
         {connMode === 'MOCK' && (
           <View style={styles.scenarioBar}>
-            <Text style={styles.scenarioLabel}>CENÁRIO:</Text>
+            <Text style={styles.scenarioLabel}>TESTE MOCK:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scenarioScroll}>
-              <TouchableOpacity onPress={() => handleDismissOverlay()} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Normal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveMomentaryOverlay('RACE_START')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Largada</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('DRS')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>DRS / Reta</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('OVERTAKE')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Overtake</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  telemetryService.forceStateScenario('SAFETY_CAR');
-                  setActiveMomentaryOverlay('SAFETY_CAR');
-                }}
-                style={styles.scenarioBtn}
-              >
-                <Text style={styles.scenarioBtnText}>Safety Car</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  telemetryService.forceStateScenario('VSC');
-                  setActiveMomentaryOverlay('VSC');
-                }}
-                style={styles.scenarioBtn}
-              >
-                <Text style={styles.scenarioBtnText}>VSC</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  telemetryService.forceStateScenario('RED_FLAG');
-                  setActiveMomentaryOverlay('RED_FLAG');
-                }}
-                style={styles.scenarioBtn}
-              >
-                <Text style={styles.scenarioBtnText}>Red Flag</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  telemetryService.forceStateScenario('PIT_LANE');
-                  setActiveMomentaryOverlay('PIT_LANE');
-                }}
-                style={styles.scenarioBtn}
-              >
-                <Text style={styles.scenarioBtnText}>Boxes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('FASTEST_LAP')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Volta Rápida</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('DAMAGE')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Dano</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => telemetryService.forceStateScenario('WET')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Chuva</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveMomentaryOverlay('CHEQUERED_FLAG')} style={styles.scenarioBtn}>
-                <Text style={styles.scenarioBtnText}>Final</Text>
-              </TouchableOpacity>
+              {[
+                { id: 'NORMAL', label: 'Normal' },
+                { id: 'START', label: 'Largada' },
+                { id: 'DRS', label: 'DRS / Reta' },
+                { id: 'OVERTAKE', label: 'Overtake' },
+                { id: 'SAFETY_CAR', label: 'Safety Car' },
+                { id: 'VSC', label: 'VSC' },
+                { id: 'RED_FLAG', label: 'Red Flag' },
+                { id: 'PIT_LANE', label: 'Boxes' },
+                { id: 'FASTEST_LAP', label: 'Volta Rápida' },
+                { id: 'WET', label: 'Chuva' },
+                { id: 'DAMAGE', label: 'Dano' },
+              ].map((sc) => {
+                const isActive = currentScenario === sc.id;
+                return (
+                  <TouchableOpacity
+                    key={sc.id}
+                    onPress={() => handleSelectScenario(sc.id as MockScenario)}
+                    style={[
+                      styles.scenarioBtn,
+                      isActive && {
+                        backgroundColor: '#1e3a5f',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1.2,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scenarioBtnText,
+                        isActive && { color: '#38bdf8', fontWeight: '900' },
+                      ]}
+                    >
+                      {sc.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         )}
@@ -300,6 +289,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                 overtakeAvailable={telemetry.overtakeAvailable ?? false}
                 overtakeActivationDistance={telemetry.overtakeActivationDistance ?? 0}
                 ersDeployMode={telemetry.ersDeployMode}
+                weather={telemetry.weather}
+                airTemperature={telemetry.airTemperature}
+                trackTemperature={telemetry.trackTemperature}
                 theme={theme}
               />
             </View>
@@ -387,7 +379,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         )}
       </View>
     </View>
-  </CockpitBackground>
+  </CockpitAtmosphere>
   );
 };
 
@@ -402,9 +394,19 @@ const styles = StyleSheet.create({
   topHeader: {
     position: 'relative',
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 8,
-    paddingBottom: 4,
-    minHeight: 42,
+    paddingBottom: 2,
+    minHeight: 52,
+  },
+  headerLeftGroup: {
+    position: 'absolute',
+    left: 8,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 10,
   },
   headerRightGroup: {
     position: 'absolute',
@@ -414,6 +416,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    zIndex: 10,
   },
   pillBtn: {
     flexDirection: 'row',

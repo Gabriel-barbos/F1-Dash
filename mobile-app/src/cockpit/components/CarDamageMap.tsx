@@ -273,7 +273,7 @@ export const CarDamageMap: React.FC<CarDamageMapProps> = memo((props) => {
   const rrBrake = brakesTemperature[1] ?? 0;
 
   return (
-    <View style={[styles.container, { borderColor: theme.cardBorder }]}>
+    <View style={[styles.container, { borderColor: theme.cardBorder, backgroundColor: theme.background.secondary }]}>
       {/* ── Header do Card ── */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1e2e',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     paddingBottom: 5,
   },
   headerTitleRow: {
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#1a1e2e',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingTop: 3,
   },
   damagePillText: {

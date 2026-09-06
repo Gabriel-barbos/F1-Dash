@@ -16,6 +16,19 @@ export type TelemetryCallback = (state: CockpitTelemetryState) => void;
 
 export type ConnectionMode = 'UDP_NATIVE' | 'WEBSOCKET' | 'MOCK';
 
+export type MockScenario =
+  | 'NORMAL'
+  | 'START'
+  | 'DRS'
+  | 'OVERTAKE'
+  | 'SAFETY_CAR'
+  | 'VSC'
+  | 'RED_FLAG'
+  | 'PIT_LANE'
+  | 'FASTEST_LAP'
+  | 'DAMAGE'
+  | 'WET';
+
 export type MomentaryEventType =
   | 'RACE_START'
   | 'SAFETY_CAR'
@@ -188,7 +201,7 @@ class TelemetryService {
     return this.mode === 'MOCK';
   }
 
-  private currentScenario: string = 'NORMAL';
+  private currentScenario: MockScenario = 'NORMAL';
 
   private startInternalMock() {
     this.stopInternalMock();
@@ -231,26 +244,45 @@ class TelemetryService {
 
       const isNormal = this.currentScenario === 'NORMAL';
 
+      let currentSpeed = Math.round(speed);
+      let currentGear = gear;
+      let currentRpm = rpm;
+      let currentLapTime = (tick * 50) % 84000;
+
+      if (this.currentScenario === 'PIT_LANE') {
+        currentSpeed = 78;
+        currentGear = 2;
+      } else if (this.currentScenario === 'START') {
+        currentSpeed = 0;
+        currentGear = 1;
+        currentRpm = 10800;
+      } else if (this.currentScenario === 'FASTEST_LAP') {
+        currentLapTime = 4000;
+      }
+
       this.currentState = {
         ...this.currentState,
         connected: true,
         packetsPerSecond: 60,
-        gear: this.currentScenario === 'PIT_LANE' ? 2 : gear,
-        engineRPM: rpm,
-        speed: this.currentScenario === 'PIT_LANE' ? 78 : Math.round(speed),
+        gear: currentGear,
+        engineRPM: currentRpm,
+        speed: currentSpeed,
         throttle: throttle,
         brake: brake,
         revLightsPercent: revPercent,
-        drsActive: isNormal ? (speed > 240 && gear >= 6) : this.currentState.drsActive,
-        drsAllowed: isNormal ? (gear >= 5) : this.currentState.drsAllowed,
         ersPercentage: ersPercent,
-        ersDeployMode: isNormal
-          ? (speed > 260 ? ERSDeployMode.Overtake : ERSDeployMode.Medium)
-          : this.currentState.ersDeployMode,
+        currentLapTimeInMS: currentLapTime,
+        // Só alterna DRS/Overtake dinamicamente no mock se for explicitamente modo DRS ou OVERTAKE
+        drsActive: this.currentScenario === 'DRS',
+        drsAllowed: this.currentScenario === 'DRS',
+        activeAeroMode: this.currentScenario === 'DRS' ? 1 : 0,
+        activeAeroAvailable: this.currentScenario === 'DRS',
+        overtakeActive: this.currentScenario === 'OVERTAKE',
+        overtakeAvailable: this.currentScenario === 'OVERTAKE',
+        ersDeployMode: this.currentScenario === 'OVERTAKE' ? ERSDeployMode.Overtake : ERSDeployMode.Medium,
         carPosition: 3,
         currentLapNum: 12,
         totalLaps: 56,
-        currentLapTimeInMS: (tick * 50) % 84000,
       };
 
       this.notify();
@@ -264,7 +296,11 @@ class TelemetryService {
     }
   }
 
-  public forceStateScenario(scenario: 'NORMAL' | 'DRS' | 'OVERTAKE' | 'SAFETY_CAR' | 'VSC' | 'RED_FLAG' | 'PIT_LANE' | 'DAMAGE' | 'FASTEST_LAP' | 'WET') {
+  public getCurrentScenario(): MockScenario {
+    return this.currentScenario;
+  }
+
+  public forceStateScenario(scenario: MockScenario) {
     this.currentScenario = scenario;
 
     // Reset base flags
@@ -291,9 +327,21 @@ class TelemetryService {
       engineDamage: 0,
       lastLapTimeInMS: 88456,
       bestLapTimeInMS: 87891,
+      currentLapTimeInMS: 35000,
     };
 
     switch (scenario) {
+      case 'START':
+        this.currentState = {
+          ...this.currentState,
+          ...baseReset,
+          safetyCarStatus: SafetyCarStatus.FormationLap,
+          speed: 0,
+          gear: 1,
+          engineRPM: 10800,
+          revLightsPercent: 75,
+        };
+        break;
       case 'SAFETY_CAR':
         this.currentState = {
           ...this.currentState,
@@ -366,6 +414,7 @@ class TelemetryService {
           ...baseReset,
           lastLapTimeInMS: 83210,
           bestLapTimeInMS: 83210,
+          currentLapTimeInMS: 4000,
         };
         break;
       case 'WET':

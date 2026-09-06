@@ -20,11 +20,11 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#ffffff',
     background: {
       primary: '#1a0505',
-      secondary: '#2a0a0a',
+      secondary: '#1c0707',
       glow: '#ef4444',
-      gradient: ['#2a0505', '#3d0a0a', '#150202'],
+      gradient: ['#2e0909', '#1a0505', '#100202'],
     },
-    cardBorder: '#7f1d1d',
+    cardBorder: '#991b1b',
     shiftLights: {
       low: '#7f1d1d',
       mid: '#dc2626',
@@ -44,12 +44,12 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     accent: '#eab308',
     badgeTextColor: '#000000',
     background: {
-      primary: '#1a1200',
-      secondary: '#261b00',
+      primary: '#1c1402',
+      secondary: '#181304',
       glow: '#ca8a04',
-      gradient: ['#2a1f00', '#1f1600', '#120c00'],
+      gradient: ['#2e2004', '#1c1402', '#0f0a01'],
     },
-    cardBorder: '#713f12',
+    cardBorder: '#784408',
     shiftLights: {
       low: '#713f12',
       mid: '#ca8a04',
@@ -69,12 +69,12 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     accent: '#f59e0b',
     badgeTextColor: '#000000',
     background: {
-      primary: '#141000',
-      secondary: '#1f1800',
+      primary: '#190e02',
+      secondary: '#170f03',
       glow: '#b45309',
-      gradient: ['#241a00', '#1a1200', '#0f0900'],
+      gradient: ['#281604', '#190e02', '#0d0701'],
     },
-    cardBorder: '#78350f',
+    cardBorder: '#7c2d12',
     shiftLights: {
       low: '#78350f',
       mid: '#b45309',
@@ -95,9 +95,9 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#000000',
     background: {
       primary: '#0c0e14',
-      secondary: '#111420',
+      secondary: '#10131d',
       glow: '#64748b',
-      gradient: ['#12141c', '#0c0e14', '#06070a'],
+      gradient: ['#141724', '#0c0e14', '#06070a'],
     },
     cardBorder: '#334155',
     shiftLights: {
@@ -120,11 +120,11 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#ffffff',
     background: {
       primary: '#170511',
-      secondary: '#220819',
+      secondary: '#1c0615',
       glow: '#be185d',
-      gradient: ['#2a0a1f', '#1f0813', '#100309'],
+      gradient: ['#2b0920', '#170511', '#0e030b'],
     },
-    cardBorder: '#831843',
+    cardBorder: '#9d174d',
     shiftLights: {
       low: '#831843',
       mid: '#be185d',
@@ -144,12 +144,12 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     accent: '#3b82f6',
     badgeTextColor: '#ffffff',
     background: {
-      primary: '#030b1a',
-      secondary: '#051020',
+      primary: '#051124',
+      secondary: '#061328',
       glow: '#1d4ed8',
-      gradient: ['#051530', '#030b1a', '#02050e'],
+      gradient: ['#092147', '#051124', '#020712'],
     },
-    cardBorder: '#1e3a8a',
+    cardBorder: '#1d4ed8',
     shiftLights: {
       low: '#1e3a8a',
       mid: '#1d4ed8',
@@ -170,11 +170,11 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#000000',
     background: {
       primary: '#011418',
-      secondary: '#011b20',
+      secondary: '#031720',
       glow: '#0891b2',
-      gradient: ['#012228', '#011820', '#000d11'],
+      gradient: ['#022630', '#011418', '#000c0f'],
     },
-    cardBorder: '#164e63',
+    cardBorder: '#0e7490',
     shiftLights: {
       low: '#164e63',
       mid: '#0891b2',
@@ -195,11 +195,11 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#ffffff',
     background: {
       primary: '#0d0514',
-      secondary: '#130720',
+      secondary: '#130722',
       glow: '#7e22ce',
-      gradient: ['#1a0828', '#120520', '#08020f'],
+      gradient: ['#1d082c', '#0d0514', '#08020f'],
     },
-    cardBorder: '#581c87',
+    cardBorder: '#6b21a8',
     shiftLights: {
       low: '#581c87',
       mid: '#7e22ce',
@@ -220,11 +220,11 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     badgeTextColor: '#000000',
     background: {
       primary: '#020e18',
-      secondary: '#031420',
+      secondary: '#041524',
       glow: '#0284c7',
-      gradient: ['#031828', '#02101c', '#010810'],
+      gradient: ['#041e33', '#020e18', '#010810'],
     },
-    cardBorder: '#075985',
+    cardBorder: '#0369a1',
     shiftLights: {
       low: '#075985',
       mid: '#0284c7',
@@ -244,10 +244,10 @@ export const COCKPIT_THEMES: Record<CockpitStateKey, CockpitTheme> = {
     accent: '#38bdf8',
     badgeTextColor: '#ffffff',
     background: {
-      primary: '#090a0f',
-      secondary: '#0f1118',
+      primary: '#050608',
+      secondary: '#0a0c14',
       glow: 'transparent',
-      gradient: ['#0f1118', '#0a0b10', '#050609'],
+      gradient: ['#0c0e18', '#07080f', '#050608'],
     },
     cardBorder: '#1e2436',
     shiftLights: {

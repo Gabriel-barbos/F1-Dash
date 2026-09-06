@@ -45,7 +45,7 @@ export const BatteryErsCard: React.FC<BatteryErsCardProps> = memo(({
   const badgeBgColor = boostActive ? 'rgba(59, 130, 246, 0.18)' : 'rgba(234, 179, 8, 0.14)';
 
   return (
-    <View style={[styles.container, { borderColor: theme.cardBorder }]}>
+    <View style={[styles.container, { borderColor: theme.cardBorder, backgroundColor: theme.background.secondary }]}>
       {/* Topo: BATERIA na esquerda e % no canto superior direito */}
       <View style={styles.topRow}>
         <Text style={styles.titleLabel}>BATERIA</Text>

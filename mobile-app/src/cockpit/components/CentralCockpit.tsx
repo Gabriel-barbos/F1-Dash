@@ -1,24 +1,36 @@
 /**
- * CentralCockpit — Bloco Central do Cockpit
+ * CentralCockpit — Redesign Completo do Center HUD
  *
- * - Topo: ShiftLightsBar (15 LEDs circulares com glow)
- * - Meio: Barra de Aceleração + GearSpeedDisplay + Barra de Freio
- * - Perfeitamente centralizado e balanceado
+ * Transforma o centro em um autêntico Instrument Cluster moderno de Fórmula 1:
+ *
+ *               [ RpmIndicator ]
+ *                  11 560 RPM
+ *         [ ACC ]     [ 7 ]     [ BRAKE ]
+ *                   283 KM/H
+ *           [ DynamicStatusIndicator ]
+ *              [ WeatherIndicator ]
+ *
+ * - Marcha gigante e dominante com resposta mecânica instantânea
+ * - Espaço negativo generoso e respirável
+ * - Sem excesso de botões ou poluição RGB
  */
 
 import React, { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ERSDeployMode } from '@f1-dash/telemetry-core';
+import { View, Text, StyleSheet } from 'react-native';
+import { ERSDeployMode, Weather } from '@f1-dash/telemetry-core';
 import { CockpitTheme } from '../theme/types';
-import { ShiftLightsBar } from './ShiftLightsBar';
-import { GearSpeedDisplay } from './GearSpeedDisplay';
-import { PedalBar } from './PedalBar';
+import { RpmIndicator } from './RpmIndicator';
+import { GearDisplay } from './GearDisplay';
+import { SpeedDisplay } from './SpeedDisplay';
+import { InputBar } from './InputBars';
+import { DynamicStatusIndicator } from './DynamicStatusIndicator';
+import { WeatherIndicator } from './WeatherIndicator';
 
 interface CentralCockpitProps {
   gear: number;
   speed: number;
   rpm: number;
-  maxRpm: number;
+  maxRpm?: number;
   revPercent: number;
   throttle: number;
   brake: number;
@@ -32,6 +44,9 @@ interface CentralCockpitProps {
   overtakeAvailable?: boolean;
   overtakeActivationDistance?: number;
   ersDeployMode?: ERSDeployMode;
+  weather?: Weather;
+  airTemperature?: number;
+  trackTemperature?: number;
   theme: CockpitTheme;
 }
 
@@ -52,24 +67,45 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
   overtakeAvailable = false,
   overtakeActivationDistance = 0,
   ersDeployMode = ERSDeployMode.Medium,
+  weather = Weather.Clear,
+  airTemperature,
+  trackTemperature,
   theme,
 }) => {
+  // Formatação do RPM com separador elegante (ex: 11 450)
+  const rpmFormatted = Math.round(rpm || 0)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
   return (
     <View style={styles.container}>
-      {/* 1. LEDs de Shift Lights no topo */}
-      <ShiftLightsBar
+      {/* 1. Indicador de RPM em pontos reativos */}
+      <RpmIndicator
         revPercent={revPercent}
         palette={theme.shiftLights}
       />
 
-      {/* 2. Coluna de Aceleração + Display de Marcha/Velocidade + Coluna de Freio */}
-      <View style={styles.mainRow}>
-        <PedalBar value={throttle} type="throttle" />
+      {/* 2. Leitura Numérica de RPM */}
+      <View style={styles.rpmRow}>
+        <Text style={styles.rpmValue}>{rpmFormatted}</Text>
+        <Text style={styles.rpmLabel}>RPM</Text>
+      </View>
 
-        <GearSpeedDisplay
-          gear={gear}
-          speed={speed}
-          rpm={rpm}
+      {/* 3. Bloco Central: Aceleração (flanco) + Marcha/Velocidade + Freio (flanco) */}
+      <View style={styles.instrumentRow}>
+        <InputBar value={throttle} type="throttle" height={105} />
+
+        <View style={styles.gearSpeedBlock}>
+          <GearDisplay gear={gear} />
+          <SpeedDisplay speed={speed} />
+        </View>
+
+        <InputBar value={brake} type="brake" height={105} />
+      </View>
+
+      {/* 4. Sistema Dinâmico de Status (DRS, Overtake, Active Aero, Boost) */}
+      <View style={styles.statusRow}>
+        <DynamicStatusIndicator
           drsActive={drsActive}
           drsAllowed={drsAllowed}
           is2026Regulations={is2026Regulations}
@@ -80,11 +116,15 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
           overtakeAvailable={overtakeAvailable}
           overtakeActivationDistance={overtakeActivationDistance}
           ersDeployMode={ersDeployMode}
-          theme={theme}
         />
-
-        <PedalBar value={brake} type="brake" />
       </View>
+
+      {/* 5. Indicador Discreto de Clima */}
+      <WeatherIndicator
+        weather={weather}
+        airTemperature={airTemperature}
+        trackTemperature={trackTemperature}
+      />
     </View>
   );
 });
@@ -95,12 +135,45 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    width: '100%',
+    paddingVertical: 2,
   },
-  mainRow: {
+  rpmRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  rpmValue: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.8,
+  },
+  rpmLabel: {
+    color: '#64748b',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  instrumentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 18,
+    gap: 16,
+    marginVertical: 2,
+  },
+  gearSpeedBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 140,
+  },
+  statusRow: {
+    marginTop: 8,
+    minHeight: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

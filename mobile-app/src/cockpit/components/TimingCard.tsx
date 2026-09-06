@@ -57,7 +57,7 @@ export const TimingCard: React.FC<TimingCardProps> = memo(({
   const displayPosition = position > 0 && position <= 24 ? `P${position}` : 'P--';
 
   return (
-    <View style={[styles.container, { borderColor: theme.cardBorder }]}>
+    <View style={[styles.container, { borderColor: theme.cardBorder, backgroundColor: theme.background.secondary }]}>
       {/* Linha 1: Posição e Volta */}
       <View style={styles.topRow}>
         <Text style={styles.positionText}>{displayPosition}</Text>
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1e2e',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     paddingBottom: 4,
   },
   positionText: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#1a1e2e',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingTop: 6,
   },
   historyLapTime: {
