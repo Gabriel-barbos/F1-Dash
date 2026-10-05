@@ -37,6 +37,10 @@ import { SafetyCarMomentaryOverlay } from '../components/momentary/SafetyCarMome
 import { RedFlagMomentaryOverlay } from '../components/momentary/RedFlagMomentaryOverlay';
 import { PitLaneMomentaryOverlay } from '../components/momentary/PitLaneMomentaryOverlay';
 import { ChequeredFlagOverlay } from '../components/momentary/ChequeredFlagOverlay';
+import { TeamRadioBanner } from '../components/momentary/TeamRadioBanner';
+import { Radio } from 'lucide-react-native';
+import { F1Font } from '../theme/typography';
+import { claudinhoMobileService } from '../services/claudinho-mobile-service';
 
 interface CockpitScreenProps {
   onNavigateToMenu?: () => void;
@@ -54,6 +58,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const [activeMomentaryOverlay, setActiveMomentaryOverlay] = useState<MomentaryEventType | null>(
     initialMomentaryOverlay
   );
+  const [isRadioTransmitting, setIsRadioTransmitting] = useState<boolean>(false);
+  const [radioPhase, setRadioPhase] = useState<'connecting' | 'live'>('connecting');
+  const [radioVoice, setRadioVoice] = useState<{ envelope: number[]; startedAt: number } | null>(null);
 
   // Tema visual ativo — recalculado apenas quando campos de estado mudam, não a cada frame
   const theme = useCockpitTheme(telemetry);
@@ -64,7 +71,11 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
 
   useEffect(() => {
     if (initialMomentaryOverlay) {
-      setActiveMomentaryOverlay(initialMomentaryOverlay);
+      if (initialMomentaryOverlay === 'TEAM_RADIO') {
+        handleTriggerClaudinhoRadio();
+      } else {
+        setActiveMomentaryOverlay(initialMomentaryOverlay);
+      }
     }
   }, [initialMomentaryOverlay]);
 
@@ -92,7 +103,11 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     });
 
     const unsubMomentary = telemetryService.subscribeMomentaryEvent((event) => {
-      setActiveMomentaryOverlay(event);
+      if (event === 'TEAM_RADIO') {
+        handleTriggerClaudinhoRadio();
+      } else {
+        setActiveMomentaryOverlay(event);
+      }
     });
 
     return () => {
@@ -108,16 +123,51 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   };
 
   const handleConnectionPress = () => {
-    // Reconecta o WebSocket e garante modo WEBSOCKET
-    telemetryService.setMode('WEBSOCKET');
-    setConnMode('WEBSOCKET');
-    telemetryService.connectWs();
+    if (connMode === 'UDP_NATIVE') {
+      telemetryService.stopNativeUdp();
+      telemetryService.startNativeUdp();
+    } else if (connMode === 'WEBSOCKET') {
+      telemetryService.connectWs();
+    } else if (connMode === 'MOCK') {
+      telemetryService.forceStateScenario(currentScenario);
+    }
   };
 
   const handleDismissOverlay = () => {
     setActiveMomentaryOverlay(null);
     // Ao fechar tela momentânea, retorna o estado do simulador para a corrida normal
     telemetryService.forceStateScenario('NORMAL');
+  };
+
+  const handleTriggerClaudinhoRadio = () => {
+    if (isRadioTransmitting) return;
+    setIsRadioTransmitting(true);
+    setRadioPhase('connecting');
+    setRadioVoice(null);
+
+    const scenario = currentScenario === 'NORMAL' ? 'OVERTAKE' : currentScenario;
+
+    claudinhoMobileService.triggerRadio(
+      scenario,
+      'Gabriel',
+      {
+        onStart: () => {
+          setIsRadioTransmitting(true);
+          setRadioPhase('connecting');
+        },
+        onVoiceStart: ({ envelope, startedAt }) => {
+          setRadioPhase('live');
+          setRadioVoice({ envelope, startedAt });
+        },
+        onEnd: () => {
+          setTimeout(() => {
+            setIsRadioTransmitting(false);
+            setRadioVoice(null);
+            setRadioPhase('connecting');
+          }, 350);
+        }
+      }
+    );
   };
 
   const hasCriticalDamage =
@@ -188,6 +238,32 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                     : (telemetry.packetsPerSecond ?? 0) > 0
                     ? `ONLINE • ${telemetry.packetsPerSecond} HZ`
                     : 'AGUARDANDO'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Botão de Rádio Claudinho Ronaldo */}
+              <TouchableOpacity
+                style={[
+                  styles.pillBtn,
+                  {
+                    backgroundColor: isRadioTransmitting ? '#381a12' : '#1c1310',
+                    borderColor: '#E05A36',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5
+                  }
+                ]}
+                onPress={handleTriggerClaudinhoRadio}
+                activeOpacity={0.7}
+              >
+                <Radio size={12} color="#FF7043" />
+                <Text
+                  style={[
+                    styles.pillBtnText,
+                    { color: '#FF7043', fontFamily: F1Font.bold, fontWeight: '700' }
+                  ]}
+                >
+                  {isRadioTransmitting ? 'TRANSMITINDO' : 'CLAUDINHO'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -378,6 +454,16 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
           />
         )}
       </View>
+
+      {/* Faixa inferior de rádio F1 Broadcast — sobreposta na parte inferior sem cobrir o cockpit */}
+      <TeamRadioBanner
+        visible={isRadioTransmitting}
+        phase={radioPhase}
+        envelope={radioVoice?.envelope}
+        voiceStartedAt={radioVoice?.startedAt}
+        engineerName="CLAUDINHO RONALDO"
+        driverName="GABRIEL"
+      />
     </View>
   </CockpitAtmosphere>
   );

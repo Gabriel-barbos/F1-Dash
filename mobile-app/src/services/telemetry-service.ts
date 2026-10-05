@@ -1,4 +1,5 @@
 import {
+  RaceState,
   CockpitTelemetryState,
   INITIAL_COCKPIT_TELEMETRY_STATE,
   TelemetryStore,
@@ -36,7 +37,8 @@ export type MomentaryEventType =
   | 'RED_FLAG'
   | 'PIT_LANE'
   | 'CAR_DAMAGE'
-  | 'CHEQUERED_FLAG';
+  | 'CHEQUERED_FLAG'
+  | 'TEAM_RADIO';
 
 export const getInitialServerHost = (): string => {
   try {
@@ -46,7 +48,7 @@ export const getInitialServerHost = (): string => {
       if (ip) return `${ip}:5173`;
     }
   } catch {}
-  return '172.20.10.6:5173';
+  return '192.168.1.104:5173';
 };
 
 class TelemetryService {
@@ -59,11 +61,21 @@ class TelemetryService {
   private mode: ConnectionMode = isRunningInExpoGo() ? 'MOCK' : 'UDP_NATIVE';
   private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
+  private lastUiUpdate: number = 0;
 
   constructor() {
     const store = TelemetryStore.getInstance();
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
+        const now = Date.now();
+        // Limita a notificação da UI para no máximo 1 vez a cada 16ms (~60 FPS)
+        // direto na recepção dos pacotes, sem depender de timers do Android que caem para 1Hz.
+        if (now - this.lastUiUpdate >= 16) {
+          this.lastUiUpdate = now;
+          this.currentState = toCockpitTelemetryState(raceState);
+          this.notify();
+        }
+      } else if (this.mode === 'UDP_NATIVE' && !raceState.connection.connected && this.currentState.connected) {
         this.currentState = toCockpitTelemetryState(raceState);
         this.notify();
       }
@@ -102,10 +114,8 @@ class TelemetryService {
     this.mode = newMode;
     if (this.mode === 'UDP_NATIVE') {
       this.stopInternalMock();
+      this.disconnectWs();
       this.startNativeUdp();
-      // Em celulares com Expo Go onde UDP direto não é liberado pelo SO,
-      // conecta via WebSocket à bridge do PC para que os pacotes do PS5 cheguem com 60 FPS
-      this.connectWs();
     } else if (this.mode === 'WEBSOCKET') {
       this.stopInternalMock();
       this.stopNativeUdp();
@@ -163,7 +173,7 @@ class TelemetryService {
         this.currentState.connected = false;
         this.notify();
         setTimeout(() => {
-          if ((this.mode === 'WEBSOCKET' || this.mode === 'UDP_NATIVE') && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
+          if (this.mode === 'WEBSOCKET' && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
             this.connectWs();
           }
         }, 2500);

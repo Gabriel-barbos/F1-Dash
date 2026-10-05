@@ -8,6 +8,30 @@ export const isRunningInExpoGo = (): boolean => {
   );
 };
 
+// Packet IDs que o Cockpit Display efetivamente exibe na tela.
+// Todos os outros (Motion, MotionEx, Participants, CarSetups, SessionHistory,
+// TyreSets, FinalClassification, LobbyInfo, TimeTrial, LapPositions) são
+// descartados ANTES de parsear para não sobrecarregar o Hermes do celular.
+// No PC esses pacotes continuam sendo processados normalmente pelo core.
+const COCKPIT_PACKET_IDS = new Set([
+  1,   // Session       — clima, safety car, bandeiras
+  2,   // LapData       — tempos, posições, setores
+  3,   // Event         — largada, ultrapassagens, bandeirada
+  6,   // CarTelemetry  — velocidade, RPM, marcha, pedais, temps pneus
+  7,   // CarStatus     — ERS, combustível, DRS, compostos, FIA flags
+  10,  // CarDamage     — danos em asas, motor, assoalho
+  16,  // CarTelemetry2 — Active Aero 2026, Overtake
+]);
+
+/**
+ * Lê o byte no offset 6 do buffer bruto (PacketId) sem alocar objetos.
+ * Retorna -1 se o buffer for muito pequeno.
+ */
+function peekPacketIdRaw(data: Uint8Array): number {
+  if (data.length < 7) return -1;
+  return data[6];
+}
+
 export class NativeUdpReceiver {
   private socket: any = null;
   private subscription: any = null;
@@ -46,6 +70,12 @@ export class NativeUdpReceiver {
             if (!event || !event.data) return;
             const buffer =
               event.data instanceof Uint8Array ? event.data : new Uint8Array(event.data);
+
+            // Filtro rápido: descarta pacotes que o cockpit não exibe (Motion, MotionEx, etc.)
+            // antes de alocar qualquer objeto no parser. Apenas 1 leitura de byte.
+            const packetId = peekPacketIdRaw(buffer);
+            if (!COCKPIT_PACKET_IDS.has(packetId)) return;
+
             const parsed = ParserRegistry.parse(buffer);
             if (parsed) {
               this.store.processPacket(parsed);
@@ -89,6 +119,10 @@ export class NativeUdpReceiver {
             } else {
               buffer = msg;
             }
+
+            // Filtro rápido: descarta pacotes que o cockpit não exibe
+            const packetId = peekPacketIdRaw(buffer);
+            if (!COCKPIT_PACKET_IDS.has(packetId)) return;
 
             const parsed = ParserRegistry.parse(buffer);
             if (parsed) {

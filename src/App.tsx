@@ -13,12 +13,14 @@ import {
   Formatters
 } from '@f1-dash/telemetry-core';
 import { CarDamageMap } from './components/CarDamageMap';
+import { useRaceEngineer, TeamRadioOverlay } from './modules/race-engineer';
 
 export const App: React.FC = () => {
   const [telemetry, setTelemetry] = useState<CockpitTelemetryState>(
     TelemetryStore.getInstance().getCockpitState()
   );
   const [wsConnected, setWsConnected] = useState(false);
+  const { isRadioActive, currentMessage, triggerManualTest, config: engineerConfig } = useRaceEngineer();
 
   useEffect(() => {
     // 1. Ouvir store local
@@ -81,6 +83,14 @@ export const App: React.FC = () => {
 
   return (
     <div style={styles.appContainer}>
+      {/* Team Radio Overlay - Claudinho Ronaldo (IA) */}
+      <TeamRadioOverlay
+        isVisible={isRadioActive}
+        currentMessage={currentMessage}
+        engineerName={engineerConfig.personality.name}
+        driverName={engineerConfig.personality.driverName}
+      />
+
       {/* 1. Barra Superior de Status */}
       <header style={styles.topHeader}>
         <div style={styles.connectionStatus}>
@@ -96,9 +106,35 @@ export const App: React.FC = () => {
               : 'AGUARDANDO TELEMETRIA UDP (PORTA 20777)...'}
           </span>
         </div>
-        <div style={styles.weatherInfo}>
-          <span>🌡️ Pista: {telemetry.trackTemperature}°C</span>
-          <span style={{ marginLeft: 12 }}>Ar: {telemetry.airTemperature}°C</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Botão de Teste Rápido de Rádio do Claudinho Ronaldo */}
+          <button
+            onClick={() => triggerManualTest('OVERTAKE')}
+            style={{
+              background: 'linear-gradient(135deg, #E05A36 0%, #B84A28 100%)',
+              color: '#FFF',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '6px',
+              padding: '4px 12px',
+              fontSize: '11px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              letterSpacing: '0.8px',
+              boxShadow: '0 0 12px rgba(224, 90, 54, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+            title="Simular mensagem do engenheiro Claudinho Ronaldo"
+          >
+            <span>📻</span> CLAUDINHO RONALDO
+          </button>
+
+          <div style={styles.weatherInfo}>
+            <span>🌡️ Pista: {telemetry.trackTemperature}°C</span>
+            <span style={{ marginLeft: 12 }}>Ar: {telemetry.airTemperature}°C</span>
+          </div>
         </div>
       </header>
 

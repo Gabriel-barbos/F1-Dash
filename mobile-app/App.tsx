@@ -3,11 +3,15 @@ import { StyleSheet, View, Platform, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
+import { useKeepAwake } from 'expo-keep-awake';
 import { MenuScreen } from './src/screens/MenuScreen';
 import { CockpitScreen } from './src/screens/CockpitScreen';
 import { MomentaryEventType } from './src/services/telemetry-service';
+import { useF1Fonts } from './src/theme/typography';
 
 export default function App() {
+  useKeepAwake();
+  const fontsLoaded = useF1Fonts();
   const [currentScreen, setCurrentScreen] = useState<'MENU' | 'COCKPIT'>('MENU');
   const [initialOverlay, setInitialOverlay] = useState<MomentaryEventType | null>(null);
 
@@ -47,6 +51,10 @@ export default function App() {
     setInitialOverlay(null);
     setCurrentScreen('MENU');
   };
+
+  if (!fontsLoaded) {
+    return <View style={styles.container} />;
+  }
 
   return (
     <SafeAreaProvider>
