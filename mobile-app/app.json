@@ -5,9 +5,6 @@
     "version": "1.0.0",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "backgroundColor": "#09090b"
-    },
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true
@@ -16,13 +13,6 @@
       "package": "com.f1cockpit.app",
       "adaptiveIcon": {
         "backgroundColor": "#09090b"
-      },
-      "navigationBar": {
-        "visible": "sticky-immersive"
-      },
-      "statusBar": {
-        "hidden": true,
-        "translucent": true
       }
     },
     "plugins": [

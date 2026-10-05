@@ -1,0 +1,9 @@
+node_modules
+.expo
+dist
+web-build
+f1_cockpit_assets
+electron
+src
+public
+tests
