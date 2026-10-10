@@ -142,10 +142,17 @@ export class ClaudinhoMobileService {
     });
 
     for (const model of TTS_MODELS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4500);
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-goog-api-key': API_KEY }, body }
+          {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', 'X-goog-api-key': API_KEY },
+            body
+          }
         );
         if (!res.ok) {
           console.warn(`[ClaudinhoMobile] ${model} status ${res.status}${model !== TTS_MODELS[TTS_MODELS.length - 1] ? ' — tentando próximo modelo 3.8' : ''}`);
@@ -159,9 +166,39 @@ export class ClaudinhoMobileService {
         }
       } catch (err) {
         console.warn(`[ClaudinhoMobile] ${model} falhou:`, err);
+      } finally {
+        clearTimeout(timer);
       }
     }
     return undefined;
+  }
+
+  /**
+   * Reproduz um rádio pré-gerado vindo do PC Relay (evita requisições externas no celular)
+   */
+  public async playDirectRadio(
+    eventScenario: string,
+    text: string,
+    wavBase64?: string,
+    callbacks: RadioCallbacks = {}
+  ): Promise<void> {
+    if (this.isTransmitting) return;
+    this.isTransmitting = true;
+
+    const beepDone = mobileAudioPlayer.playRadioBeep();
+    callbacks.onStart?.(text);
+
+    try {
+      await beepDone;
+      if (wavBase64) {
+        await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+      }
+    } catch (err) {
+      console.warn('[ClaudinhoMobile] Erro ao reproduzir rádio direto:', err);
+    } finally {
+      this.isTransmitting = false;
+      callbacks.onEnd?.();
+    }
   }
 
   public async triggerRadio(

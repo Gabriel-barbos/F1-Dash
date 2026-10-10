@@ -152,7 +152,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
                 <TextInput
                   value={hostInput}
                   onChangeText={setHostInput}
-                  placeholder="Ex: 192.168.1.104:5173"
+                  placeholder="Ex: 192.168.0.75:20778"
                   placeholderTextColor="#64748b"
                   style={styles.ipInput}
                   autoCapitalize="none"

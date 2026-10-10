@@ -45,16 +45,16 @@ export const getInitialServerHost = (): string => {
     const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
     if (hostUri) {
       const ip = hostUri.split(':')[0];
-      if (ip) return `${ip}:5173`;
+      if (ip) return `${ip}:20778`;
     }
   } catch {}
-  return '192.168.1.104:5173';
+  return '192.168.0.75:20778';
 };
 
 class TelemetryService {
   private ws: WebSocket | null = null;
   private listeners: Set<TelemetryCallback> = new Set();
-  private momentaryListeners: Set<(type: MomentaryEventType) => void> = new Set();
+  private momentaryListeners: Set<(type: MomentaryEventType, payload?: any) => void> = new Set();
   private currentState: CockpitTelemetryState = { ...INITIAL_COCKPIT_TELEMETRY_STATE };
   private mockInterval: any = null;
   private serverHost: string = getInitialServerHost();
@@ -68,9 +68,8 @@ class TelemetryService {
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
         const now = Date.now();
-        // Limita a notificação da UI para no máximo 1 vez a cada 16ms (~60 FPS)
-        // direto na recepção dos pacotes, sem depender de timers do Android que caem para 1Hz.
-        if (now - this.lastUiUpdate >= 16) {
+        // Limita a notificação da UI para ~30 FPS (a cada 33ms) para evitar gargalos no thread JS
+        if (now - this.lastUiUpdate >= 33) {
           this.lastUiUpdate = now;
           this.currentState = toCockpitTelemetryState(raceState);
           this.notify();
@@ -164,6 +163,10 @@ class TelemetryService {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data && data.type === 'TEAM_RADIO') {
+            this.triggerMomentaryEvent('TEAM_RADIO', data);
+            return;
+          }
           this.currentState = { ...this.currentState, ...data };
           this.notify();
         } catch {}
@@ -459,14 +462,14 @@ class TelemetryService {
     return this.serverHost;
   }
 
-  public subscribeMomentaryEvent(callback: (type: MomentaryEventType) => void): () => void {
+  public subscribeMomentaryEvent(callback: (type: MomentaryEventType, payload?: any) => void): () => void {
     this.momentaryListeners.add(callback);
     return () => {
       this.momentaryListeners.delete(callback);
     };
   }
 
-  public triggerMomentaryEvent(type: MomentaryEventType) {
+  public triggerMomentaryEvent(type: MomentaryEventType, payload?: any) {
     if (type === 'SAFETY_CAR') {
       this.forceStateScenario('SAFETY_CAR');
     } else if (type === 'VSC') {
@@ -480,7 +483,7 @@ class TelemetryService {
     }
 
     for (const listener of this.momentaryListeners) {
-      listener(type);
+      listener(type, payload);
     }
   }
 }

@@ -109,6 +109,42 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     });
   };
 
+  const handleTriggerClaudinhoDirect = (scenario: string, text: string, wavBase64?: string) => {
+    if (isRadioTransmittingRef.current) return;
+    isRadioTransmittingRef.current = true;
+    setIsRadioTransmitting(true);
+    setRadioPhase('connecting');
+    setRadioVoice(null);
+
+    claudinhoMobileService.playDirectRadio(
+      scenario,
+      text,
+      wavBase64,
+      {
+        onStart: () => {
+          isRadioTransmittingRef.current = true;
+          setIsRadioTransmitting(true);
+          setRadioPhase('connecting');
+        },
+        onVoiceStart: ({ envelope, startedAt }) => {
+          setRadioPhase('live');
+          setRadioVoice({ envelope, startedAt });
+        },
+        onEnd: () => {
+          setTimeout(() => {
+            isRadioTransmittingRef.current = false;
+            setIsRadioTransmitting(false);
+            setRadioVoice(null);
+            setRadioPhase('connecting');
+          }, 350);
+        }
+      }
+    ).catch(() => {
+      isRadioTransmittingRef.current = false;
+      setIsRadioTransmitting(false);
+    });
+  };
+
   const triggerRadioRef = useRef(handleTriggerClaudinhoRadio);
   triggerRadioRef.current = handleTriggerClaudinhoRadio;
 
@@ -153,9 +189,13 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       });
     });
 
-    const unsubMomentary = telemetryService.subscribeMomentaryEvent((event) => {
+    const unsubMomentary = telemetryService.subscribeMomentaryEvent((event, payload) => {
       if (event === 'TEAM_RADIO') {
-        triggerRadioRef.current();
+        if (payload?.wavBase64) {
+          handleTriggerClaudinhoDirect(payload.scenario || 'OVERTAKE', payload.text || '', payload.wavBase64);
+        } else {
+          triggerRadioRef.current(payload?.scenario);
+        }
       } else {
         setActiveMomentaryOverlay(event);
       }

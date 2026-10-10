@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "vite",
     "mobile": "npm --prefix mobile-app start",
-    "mock": "tsx simulator/mock-sender.ts",
-    "diag": "tsx simulator/diagnostic-server.ts",
+    "mock": "node --import tsx simulator/mock-sender.ts",
+    "diag": "node --import tsx simulator/diagnostic-server.ts",
+    "relay": "node --import tsx simulator/relay-server.ts",
     "build": "vite build",
     "test": "node --import tsx --test tests/*.test.ts"
   },
