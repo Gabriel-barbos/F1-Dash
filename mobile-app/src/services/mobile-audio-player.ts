@@ -8,6 +8,13 @@ try {
   console.warn('[MobileAudioPlayer] expo-audio não disponível neste ambiente.');
 }
 
+let expoSpeechModule: any = null;
+try {
+  expoSpeechModule = require('expo-speech');
+} catch (e) {
+  console.warn('[MobileAudioPlayer] expo-speech não disponível neste ambiente.');
+}
+
 const BEEP_ASSET = require('../../assets/engineer/formula-1-radio-notification.mp3');
 
 export interface VoicePlaybackCallbacks {
@@ -133,8 +140,53 @@ export class MobileAudioPlayer {
     }
   }
 
+  /**
+   * Síntese local de voz offline (caso o Gemini TTS falhe ou o celular fique sem internet momentaneamente).
+   * Garante que o Claudinho Ronaldo fale 100% das vezes.
+   */
+  public async playSpeechFallback(text: string, callbacks: VoicePlaybackCallbacks = {}): Promise<void> {
+    this.stopVoice();
+    if (!expoSpeechModule?.speak) {
+      console.warn('[MobileAudioPlayer] expo-speech indisponível.');
+      return;
+    }
+
+    try {
+      await this.ensureAudioMode();
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          resolve();
+        };
+
+        callbacks.onPlaybackStart?.({
+          envelope: [0.35, 0.75, 0.95, 0.6, 0.45, 0.85, 0.55],
+          durationMs: 3200,
+          startedAt: Date.now()
+        });
+
+        expoSpeechModule.speak(text, {
+          language: 'pt-BR',
+          pitch: 0.9,
+          rate: 1.05,
+          onDone: finish,
+          onError: finish,
+        });
+
+        setTimeout(finish, 4500);
+      });
+    } catch (err) {
+      console.warn('[MobileAudioPlayer] Erro na síntese local de voz:', err);
+    }
+  }
+
   private stopVoice(): void {
     try {
+      if (expoSpeechModule?.stop) {
+        expoSpeechModule.stop();
+      }
       if (this.currentPlayer) {
         this.currentPlayer.pause?.();
         this.currentPlayer.remove?.();

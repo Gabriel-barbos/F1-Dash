@@ -13,7 +13,10 @@ export class TelemetryParser {
    * - F1 25 / Formato 2026 (24 carros x 59 bytes)
    * - F1 24 / Formato 2024 (22 carros x 60 bytes)
    */
-  public static parse(data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): PacketCarTelemetry {
+  public static parse(
+    data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): PacketCarTelemetry {
     const reader = new BinaryReader(data);
     const header = HeaderParser.parse(reader);
 
@@ -23,28 +26,37 @@ export class TelemetryParser {
 
     const payloadLength = reader.remainingBytes();
     const detectedEntrySize = isFormat2026 ? 59 : Math.max(58, Math.floor((payloadLength - 3) / numCars));
+    const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
-    for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(55)) break;
-      const startOffset = reader.getOffset();
-      const telemetryEntry = TelemetryParser.parseCarTelemetryEntry(reader, isFormat2026, detectedEntrySize);
-      carTelemetryData.push(telemetryEntry);
+    let playerCarTelemetry: CarTelemetryData;
 
-      const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
-        reader.skip(detectedEntrySize - bytesRead);
+    if (options.playerOnly) {
+      const startPayloadOffset = reader.getOffset();
+      reader.setOffset(startPayloadOffset + playerIndex * detectedEntrySize);
+      playerCarTelemetry = TelemetryParser.parseCarTelemetryEntry(reader, isFormat2026, detectedEntrySize);
+      reader.setOffset(startPayloadOffset + numCars * detectedEntrySize);
+      carTelemetryData.push(playerCarTelemetry);
+    } else {
+      for (let i = 0; i < numCars; i++) {
+        if (!reader.hasRemaining(55)) break;
+        const startOffset = reader.getOffset();
+        const telemetryEntry = TelemetryParser.parseCarTelemetryEntry(reader, isFormat2026, detectedEntrySize);
+        carTelemetryData.push(telemetryEntry);
+
+        const bytesRead = reader.getOffset() - startOffset;
+        if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
+          reader.skip(detectedEntrySize - bytesRead);
+        }
       }
+      playerCarTelemetry =
+        playerIndex >= 0 && playerIndex < carTelemetryData.length
+          ? carTelemetryData[playerIndex]
+          : (carTelemetryData[0] || TelemetryParser.createEmptyTelemetry());
     }
 
     const mfdPanelIndex = reader.hasRemaining(1) ? reader.readUInt8() : 255;
     const mfdPanelIndexSecondaryPlayer = reader.hasRemaining(1) ? reader.readUInt8() : 255;
     const suggestedGear = reader.hasRemaining(1) ? reader.readInt8() : 0;
-
-    const playerIndex = header.playerCarIndex;
-    const playerCarTelemetry =
-      playerIndex >= 0 && playerIndex < carTelemetryData.length
-        ? carTelemetryData[playerIndex]
-        : (carTelemetryData[0] || TelemetryParser.createEmptyTelemetry());
 
     return {
       header,

@@ -76,7 +76,7 @@ export class NativeUdpReceiver {
             const packetId = peekPacketIdRaw(buffer);
             if (!COCKPIT_PACKET_IDS.has(packetId)) return;
 
-            const parsed = ParserRegistry.parse(buffer);
+            const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
             if (parsed) {
               this.store.processPacket(parsed);
             }
@@ -124,7 +124,7 @@ export class NativeUdpReceiver {
             const packetId = peekPacketIdRaw(buffer);
             if (!COCKPIT_PACKET_IDS.has(packetId)) return;
 
-            const parsed = ParserRegistry.parse(buffer);
+            const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
             if (parsed) {
               this.store.processPacket(parsed);
             }

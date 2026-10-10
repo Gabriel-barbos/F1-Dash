@@ -10,7 +10,10 @@ export class CarDamageParser {
   /**
    * Decodifica o pacote de Danos dos Carros (Packet ID 10).
    */
-  public static parse(data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): PacketCarDamage {
+  public static parse(
+    data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): PacketCarDamage {
     const reader = new BinaryReader(data);
     const header = HeaderParser.parse(reader);
 
@@ -21,24 +24,33 @@ export class CarDamageParser {
     const payloadLength = reader.remainingBytes();
     const detectedEntrySize = Math.max(38, Math.floor(payloadLength / numCars));
     const hasTyreBlisters = detectedEntrySize >= 46 || header.packetFormat >= 2024 || header.gameYear >= 24;
+    const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
-    for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(36)) break;
-      const startOffset = reader.getOffset();
-      const damageEntry = CarDamageParser.parseCarDamageEntry(reader, hasTyreBlisters);
-      carDamageData.push(damageEntry);
+    let playerCarDamage: CarDamageData;
 
-      const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
-        reader.skip(detectedEntrySize - bytesRead);
+    if (options.playerOnly) {
+      const startPayloadOffset = reader.getOffset();
+      reader.setOffset(startPayloadOffset + playerIndex * detectedEntrySize);
+      playerCarDamage = CarDamageParser.parseCarDamageEntry(reader, hasTyreBlisters);
+      reader.setOffset(startPayloadOffset + numCars * detectedEntrySize);
+      carDamageData.push(playerCarDamage);
+    } else {
+      for (let i = 0; i < numCars; i++) {
+        if (!reader.hasRemaining(36)) break;
+        const startOffset = reader.getOffset();
+        const damageEntry = CarDamageParser.parseCarDamageEntry(reader, hasTyreBlisters);
+        carDamageData.push(damageEntry);
+
+        const bytesRead = reader.getOffset() - startOffset;
+        if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
+          reader.skip(detectedEntrySize - bytesRead);
+        }
       }
+      playerCarDamage =
+        playerIndex >= 0 && playerIndex < carDamageData.length
+          ? carDamageData[playerIndex]
+          : (carDamageData[0] || CarDamageParser.createEmptyDamage());
     }
-
-    const playerIndex = header.playerCarIndex;
-    const playerCarDamage =
-      playerIndex >= 0 && playerIndex < carDamageData.length
-        ? carDamageData[playerIndex]
-        : (carDamageData[0] || CarDamageParser.createEmptyDamage());
 
     return {
       header,

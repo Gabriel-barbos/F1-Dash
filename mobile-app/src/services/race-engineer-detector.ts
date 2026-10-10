@@ -24,6 +24,7 @@ export class RaceEngineerDetector {
   private prevPitLimiter: boolean = false;
   private prevLapNum: number = 0;
   private prevBestLapTime: number = 0;
+  private prevSpeed: number = 0;
   private prevTyreWearThresholdNotified: Set<number> = new Set();
 
   private lastGlobalTriggerTime: number = 0;
@@ -54,6 +55,7 @@ export class RaceEngineerDetector {
     this.prevPitLimiter = false;
     this.prevLapNum = 0;
     this.prevBestLapTime = 0;
+    this.prevSpeed = 0;
     this.prevTyreWearThresholdNotified.clear();
     this.lastGlobalTriggerTime = 0;
     this.lastTriggerByScenario.clear();
@@ -85,6 +87,7 @@ export class RaceEngineerDetector {
       state.frontRightWingDamage ?? 0
     );
 
+    const curSpeed = state.speed ?? 0;
     const now = Date.now();
 
     // Na primeira leitura de telemetria após conectar, apenas registra o estado base
@@ -99,6 +102,7 @@ export class RaceEngineerDetector {
       this.prevPitLimiter = !!state.pitLimiterActive;
       this.prevLapNum = state.currentLapNum ?? 0;
       this.prevBestLapTime = state.bestLapTimeInMS ?? 0;
+      this.prevSpeed = curSpeed;
       return;
     }
 
@@ -117,11 +121,17 @@ export class RaceEngineerDetector {
     };
 
     // 1. IMPACTO / BATIDA / NOVO DANO (Alta Prioridade)
-    // Se o dano total aumentou em >= 4% ou a asa dianteira tomou impacto de >= 5%
+    // Dispara se:
+    // a) O dano do carro subiu (>= 2% ou asa >= 2% ou motor estourou)
+    // b) Ou desaceleração brusca de choque contra barreira (estava a >= 50 km/h e caiu para <= 15 km/h sem freio completo)
     const damageDelta = currentDamageSum - this.prevDamageSum;
     const wingDelta = maxWingDamage - this.prevMaxWingDamage;
+    const isSuddenImpact =
+      this.prevSpeed >= 50 &&
+      curSpeed <= 15 &&
+      (state.brake ?? 0) < 0.85;
 
-    if (damageDelta >= 4 || wingDelta >= 5 || state.engineBlown) {
+    if (damageDelta >= 3 || wingDelta >= 3 || isSuddenImpact || state.engineBlown) {
       if (canSpeakScenario('DAMAGE', this.cooldownDamageMs)) {
         trigger('DAMAGE', this.cooldownDamageMs);
       }
@@ -132,6 +142,7 @@ export class RaceEngineerDetector {
       this.prevDamageSum = currentDamageSum;
       this.prevMaxWingDamage = maxWingDamage;
     }
+    this.prevSpeed = curSpeed;
 
     // 2. BANDEIRA VERMELHA
     if (state.isRedFlagActive && !this.prevRedFlag) {

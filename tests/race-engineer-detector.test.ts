@@ -58,6 +58,25 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
     assert.strictEqual(triggeredScenario, null, 'Pequena variação não deve disparar');
   });
 
+  test('deve disparar DAMAGE em batida com desaceleração violenta mesmo com dano do jogo desativado (0%)', () => {
+    const detector = new RaceEngineerDetector({ cooldownDamageMs: 100 });
+    let triggeredScenario: string | null = null;
+
+    // Vinha a 160 km/h
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 160, brake: 0, frontLeftWingDamage: 0 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, null);
+
+    // Bateu no muro (caiu para 5 km/h sem freio total, dano do jogo desligado)
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 5, brake: 0.2, frontLeftWingDamage: 0 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'DAMAGE', 'Deve detectar choque violento contra muro');
+  });
+
   test('deve disparar SAFETY_CAR quando o safety car entrar na pista', () => {
     const detector = new RaceEngineerDetector();
     let triggeredScenario: string | null = null;

@@ -12,6 +12,7 @@ import {
 } from '@f1-dash/telemetry-core';
 import Constants from 'expo-constants';
 import { nativeUdpReceiver, isRunningInExpoGo } from './native-udp-receiver';
+import { raceEngineerDetector } from './race-engineer-detector';
 
 export type TelemetryCallback = (state: CockpitTelemetryState) => void;
 
@@ -67,11 +68,18 @@ class TelemetryService {
     const store = TelemetryStore.getInstance();
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
+        const cockpitState = toCockpitTelemetryState(raceState);
+
+        // Avalia eventos de corrida em tempo real a cada pacote UDP sem throttling
+        raceEngineerDetector.evaluate(cockpitState, (scenario) => {
+          this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
+        });
+
         const now = Date.now();
-        // Limita a notificação da UI para ~30 FPS (a cada 33ms) para evitar gargalos no thread JS
+        // Limita a notificação pesada da UI para ~30 FPS (a cada 33ms) para manter o thread JS leve
         if (now - this.lastUiUpdate >= 33) {
           this.lastUiUpdate = now;
-          this.currentState = toCockpitTelemetryState(raceState);
+          this.currentState = cockpitState;
           this.notify();
         }
       } else if (this.mode === 'UDP_NATIVE' && !raceState.connection.connected && this.currentState.connected) {

@@ -31,7 +31,10 @@ export class ParserRegistry {
   /**
    * Decodifica qualquer pacote de telemetria da F1 dinamicamente pelo PacketId.
    */
-  public static parse(buffer: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): ParsedPacket | null {
+  public static parse(
+    buffer: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): ParsedPacket | null {
     try {
       const packetId = HeaderParser.peekPacketId(buffer);
 
@@ -39,7 +42,7 @@ export class ParserRegistry {
         case PacketId.CarTelemetry:
           return {
             type: PacketId.CarTelemetry,
-            data: TelemetryParser.parse(buffer)
+            data: TelemetryParser.parse(buffer, options)
           };
 
         case PacketId.CarTelemetry2:
@@ -57,19 +60,19 @@ export class ParserRegistry {
         case PacketId.LapData:
           return {
             type: PacketId.LapData,
-            data: LapDataParser.parse(buffer)
+            data: LapDataParser.parse(buffer, options)
           };
 
         case PacketId.CarStatus:
           return {
             type: PacketId.CarStatus,
-            data: CarStatusParser.parse(buffer)
+            data: CarStatusParser.parse(buffer, options)
           };
 
         case PacketId.CarDamage:
           return {
             type: PacketId.CarDamage,
-            data: CarDamageParser.parse(buffer)
+            data: CarDamageParser.parse(buffer, options)
           };
 
         case PacketId.Event:

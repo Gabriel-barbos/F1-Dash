@@ -13,7 +13,10 @@ export class CarStatusParser {
    * Decodifica o pacote completo de Car Status (Packet ID 7).
    * Suporta dinamicamente 55 bytes/carro (com enginePower) e 46/47 bytes/carro.
    */
-  public static parse(data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): PacketCarStatus {
+  public static parse(
+    data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): PacketCarStatus {
     const reader = new BinaryReader(data);
     const header = HeaderParser.parse(reader);
 
@@ -23,24 +26,33 @@ export class CarStatusParser {
 
     const payloadLength = reader.remainingBytes();
     const detectedEntrySize = Math.max(40, Math.floor(payloadLength / numCars));
+    const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
-    for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(40)) break;
-      const startOffset = reader.getOffset();
-      const statusEntry = CarStatusParser.parseCarStatusEntry(reader, detectedEntrySize);
-      carStatusData.push(statusEntry);
+    let playerCarStatus: CarStatusData;
 
-      const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
-        reader.skip(detectedEntrySize - bytesRead);
+    if (options.playerOnly) {
+      const startPayloadOffset = reader.getOffset();
+      reader.setOffset(startPayloadOffset + playerIndex * detectedEntrySize);
+      playerCarStatus = CarStatusParser.parseCarStatusEntry(reader, detectedEntrySize);
+      reader.setOffset(startPayloadOffset + numCars * detectedEntrySize);
+      carStatusData.push(playerCarStatus);
+    } else {
+      for (let i = 0; i < numCars; i++) {
+        if (!reader.hasRemaining(40)) break;
+        const startOffset = reader.getOffset();
+        const statusEntry = CarStatusParser.parseCarStatusEntry(reader, detectedEntrySize);
+        carStatusData.push(statusEntry);
+
+        const bytesRead = reader.getOffset() - startOffset;
+        if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
+          reader.skip(detectedEntrySize - bytesRead);
+        }
       }
+      playerCarStatus =
+        playerIndex >= 0 && playerIndex < carStatusData.length
+          ? carStatusData[playerIndex]
+          : (carStatusData[0] || CarStatusParser.createEmptyStatus());
     }
-
-    const playerIndex = header.playerCarIndex;
-    const playerCarStatus =
-      playerIndex >= 0 && playerIndex < carStatusData.length
-        ? carStatusData[playerIndex]
-        : (carStatusData[0] || CarStatusParser.createEmptyStatus());
 
     return {
       header,

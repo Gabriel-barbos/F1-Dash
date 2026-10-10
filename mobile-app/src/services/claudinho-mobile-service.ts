@@ -192,6 +192,8 @@ export class ClaudinhoMobileService {
       await beepDone;
       if (wavBase64) {
         await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+      } else if (text) {
+        await mobileAudioPlayer.playSpeechFallback(text, { onPlaybackStart: callbacks.onVoiceStart });
       }
     } catch (err) {
       console.warn('[ClaudinhoMobile] Erro ao reproduzir rádio direto:', err);
@@ -224,7 +226,12 @@ export class ClaudinhoMobileService {
       const wavBase64 = await this.fetchVoice(radioText);
       await beepDone; // nunca sobrepõe o bipe com a voz
 
-      await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+      if (wavBase64) {
+        await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+      } else {
+        console.log('[ClaudinhoMobile] 📢 Usando síntese local offline para o Claudinho:', radioText);
+        await mobileAudioPlayer.playSpeechFallback(radioText, { onPlaybackStart: callbacks.onVoiceStart });
+      }
     } catch (err) {
       console.warn('[ClaudinhoMobile] Erro na transmissão:', err);
     } finally {

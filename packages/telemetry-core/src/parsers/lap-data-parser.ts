@@ -13,7 +13,10 @@ export class LapDataParser {
    * Decodifica o pacote completo de Lap Data (Packet ID 2).
    * 54 bytes exatos por carro.
    */
-  public static parse(data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): PacketLapData {
+  public static parse(
+    data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): PacketLapData {
     const reader = new BinaryReader(data);
     const header = HeaderParser.parse(reader);
 
@@ -24,27 +27,36 @@ export class LapDataParser {
     const payloadLength = reader.remainingBytes();
     // 2 bytes adicionais no final para timeTrialPBCarIdx e timeTrialRivalCarIdx
     const detectedEntrySize = Math.max(45, Math.floor((payloadLength >= (numCars * 45) + 2 ? payloadLength - 2 : payloadLength) / numCars));
+    const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
-    for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(45)) break;
-      const startOffset = reader.getOffset();
-      const entry = LapDataParser.parseLapDataEntry(reader);
-      lapData.push(entry);
+    let playerLapData: LapData;
 
-      const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
-        reader.skip(detectedEntrySize - bytesRead);
+    if (options.playerOnly) {
+      const startPayloadOffset = reader.getOffset();
+      reader.setOffset(startPayloadOffset + playerIndex * detectedEntrySize);
+      playerLapData = LapDataParser.parseLapDataEntry(reader);
+      reader.setOffset(startPayloadOffset + numCars * detectedEntrySize);
+      lapData.push(playerLapData);
+    } else {
+      for (let i = 0; i < numCars; i++) {
+        if (!reader.hasRemaining(45)) break;
+        const startOffset = reader.getOffset();
+        const entry = LapDataParser.parseLapDataEntry(reader);
+        lapData.push(entry);
+
+        const bytesRead = reader.getOffset() - startOffset;
+        if (bytesRead < detectedEntrySize && reader.hasRemaining(detectedEntrySize - bytesRead)) {
+          reader.skip(detectedEntrySize - bytesRead);
+        }
       }
+      playerLapData =
+        playerIndex >= 0 && playerIndex < lapData.length
+          ? lapData[playerIndex]
+          : (lapData[0] || LapDataParser.createEmpty());
     }
 
     const timeTrialPBCarIdx = reader.hasRemaining(1) ? reader.readUInt8() : 255;
     const timeTrialRivalCarIdx = reader.hasRemaining(1) ? reader.readUInt8() : 255;
-
-    const playerIndex = header.playerCarIndex;
-    const playerLapData =
-      playerIndex >= 0 && playerIndex < lapData.length
-        ? lapData[playerIndex]
-        : (lapData[0] || LapDataParser.createEmpty());
 
     return {
       header,
