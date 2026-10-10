@@ -1,6 +1,23 @@
 import { mobileAudioPlayer } from './mobile-audio-player';
 import { getClaudinhoClip, ClaudinhoClip } from './claudinho-clips';
 
+const API_KEY = 'AQ.Ab8RN6LgIEBTDjoOU0k7dj_BYMD9Slh6fjVUuZWpuS82HOCyyA';
+
+const CLAUDINHO_SYSTEM_PROMPT = `
+Você é o "Claudinho Ronaldo", engenheiro de corrida brasileiro de Fórmula 1 e melhor amigo de resenha do piloto Gabriel.
+Fale em português brasileiro, com resenha, palavrões naturais ("porra", "caralho", "puta que pariu", "merda", "moleque") e em no máximo 5 segundos (máximo 10 a 14 palavras).
+Sua fala deve ser curta, enérgica, espontânea e direta ao ponto.
+Nunca aja como assistente formal. Seja o parceiro de rádio raiz.
+Responda APENAS com o texto da fala no rádio, sem aspas, sem asteriscos e sem explicações.
+`;
+
+const TTS_MODELS = [
+  'gemini-3.8-flash-lite-tts',
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-3.8-flash-tts'
+];
+
 export interface RadioTransmissionResult {
   message: string;
   tone: string;
@@ -9,9 +26,9 @@ export interface RadioTransmissionResult {
 }
 
 export interface RadioCallbacks {
-  /** Bipe de abertura já disparado — hora de mostrar o banner (fase "conectando"). */
+  /** Disparado no exato instante em que o áudio já está carregado e o rádio abre. */
   onStart?: (text: string) => void;
-  /** Voz começou a tocar — envelope de amplitude p/ sincronizar as ondinhas. */
+  /** Disparado no instante em que a voz começa a tocar (com envelope de ondas). */
   onVoiceStart?: (info: { envelope: number[]; durationMs: number; startedAt: number }) => void;
   onEnd?: () => void;
 }
@@ -20,8 +37,93 @@ export class ClaudinhoMobileService {
   private isTransmitting = false;
 
   /**
+   * Gera texto dinâmico espontâneo com o Gemini 3.8 Flash.
+   */
+  private async fetchText(eventScenario: string, driverName: string): Promise<string | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2800);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${API_KEY}`,
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', 'X-goog-api-key': API_KEY },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: CLAUDINHO_SYSTEM_PROMPT }] },
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Situação na corrida: ${eventScenario}. O piloto se chama ${driverName}. Manda uma fala curta e da resenha!`
+                  }
+                ]
+              }
+            ]
+          })
+        }
+      );
+      if (!res.ok) {
+        console.warn('[ClaudinhoMobile] Texto Gemini 3.8 status:', res.status);
+        return null;
+      }
+      const json = await res.json();
+      const text = json?.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text?.trim();
+      return text ? text.replace(/^["']|["']$/g, '') : null;
+    } catch (err) {
+      console.warn('[ClaudinhoMobile] Texto Gemini 3.8 falhou (usará biblioteca local):', err);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Sintetiza voz oficial Puck via Gemini TTS com fallback sequencial entre modelos da cota.
+   */
+  private async fetchVoice(text: string): Promise<string | null> {
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } }
+      }
+    });
+
+    for (const model of TTS_MODELS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3500);
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
+          {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', 'X-goog-api-key': API_KEY },
+            body
+          }
+        );
+        if (res.status === 200) {
+          const json = await res.json();
+          const data = json?.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
+          if (data) {
+            console.log(`[ClaudinhoMobile] 🔊 Voz dinâmica gerada com sucesso via ${model}!`);
+            return data;
+          }
+        } else {
+          console.warn(`[ClaudinhoMobile] ${model} status ${res.status} (tentando próximo modelo)...`);
+        }
+      } catch (err) {
+        console.warn(`[ClaudinhoMobile] Falha ao sintetizar com ${model}:`, err);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Reproduz um rádio pré-gerado vindo do PC Relay ou evento de rede.
-   * Só abre o banner no momento em que o áudio já está na memória, eliminando silêncios.
    */
   public async playDirectRadio(
     eventScenario: string,
@@ -34,13 +136,12 @@ export class ClaudinhoMobileService {
 
     try {
       if (wavBase64) {
-        // Áudio dinâmico em base64 recebido do PC com DSP:
-        // Abre o banner no momento exato em que o áudio está disponível
+        // Áudio dinâmico recebido: só abre o rádio no visor com o áudio pronto
         callbacks.onStart?.(text);
         await mobileAudioPlayer.playRadioBeep();
         await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
       } else {
-        // Se veio sem áudio bruto, usa o clipe autêntico do Claudinho em memória
+        // Se não tiver WAV, usa o clipe de áudio autêntico em memória (sem robô)
         const clip = getClaudinhoClip(eventScenario, 'Gabriel');
         callbacks.onStart?.(text || clip.text);
         await mobileAudioPlayer.playRadioBeep();
@@ -60,13 +161,14 @@ export class ClaudinhoMobileService {
   }
 
   /**
-   * Dispara o rádio do Claudinho Ronaldo 100% autônomo no celular.
+   * Dispara o rádio autônomo do Claudinho Ronaldo.
    *
-   * Garantias:
-   * 1. ZERO segundos de silêncio: o banner só abre quando o clipe já está na memória.
-   * 2. ZERO latência de rede: áudios autênticos pré-carregados (Puck + DSP de capacete).
-   * 3. ZERO voz robótica: nunca cai em síntese robótica do Android (expo-speech).
-   * 4. Rotação sem repetições: frases variadas por cenário com anti-repetição.
+   * FLUXO INTELIGENTE:
+   * 1. FONTE PRINCIPAL: Tenta gerar fala inédita com Gemini Flash + Gemini TTS (multi-modelo).
+   * 2. ZERO SILÊNCIO: Só abre o rádio e toca o bipe DEPOIS que o áudio já estiver pronto na memória.
+   * 3. FALLBACK DE ALTA QUALIDADE: Se a internet oscilar, timeout ou todos os modelos atingirem 429,
+   *    recorre imediatamente à biblioteca local de 27 áudios oficiais (Puck + DSP).
+   * 4. ZERO VOZ ROBÓTICA: Nunca utiliza síntese robótica do Android.
    */
   public async triggerRadio(
     eventScenario: string = 'OVERTAKE',
@@ -78,27 +180,49 @@ export class ClaudinhoMobileService {
     }
     this.isTransmitting = true;
 
+    let finalMessage = '';
+
     try {
-      // 1. Obtém o clipe de áudio autêntico do Claudinho para a situação (0ms)
-      const clip = getClaudinhoClip(eventScenario, driverName);
+      // 1. Tenta obter fala dinâmica inédita via Gemini Flash
+      let generatedText = await this.fetchText(eventScenario, driverName);
+      let dynamicWavBase64: string | null = null;
 
-      // 2. CRUCIAL: Só aciona o rádio na tela AGORA que o áudio está 100% pronto!
-      callbacks.onStart?.(clip.text);
+      if (generatedText) {
+        // 2. Se obteve texto, tenta sintetizar voz oficial com a esteira multi-modelos
+        dynamicWavBase64 = await this.fetchVoice(generatedText);
+      }
 
-      // 3. Toca o bipe oficial do rádio F1
-      await mobileAudioPlayer.playRadioBeep();
+      // 3. SE CONSEGUIU ÁUDIO DINÂMICO VIA IA:
+      if (generatedText && dynamicWavBase64) {
+        finalMessage = generatedText;
+        // Só abre a barra no rádio AGORA que a voz está pronta!
+        callbacks.onStart?.(generatedText);
+        // Toca o bipe oficial
+        await mobileAudioPlayer.playRadioBeep();
+        // Toca a voz gerada com o DSP de capacete aplicado
+        await mobileAudioPlayer.playVoice(dynamicWavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+      } else {
+        // 4. FALLBACK INTELIGENTE (se a API falhar, der 429 ou timeout):
+        console.log(`[ClaudinhoMobile] 🛡️ Ativando áudio autêntico local do Claudinho para ${eventScenario}...`);
+        const clip = getClaudinhoClip(eventScenario, driverName);
+        finalMessage = clip.text;
 
-      // 4. Sem qualquer intervalo mudo, reproduz a voz oficial com DSP de capacete
-      await mobileAudioPlayer.playAsset(
-        clip.asset,
-        clip.envelope,
-        clip.durationMs,
-        { onPlaybackStart: callbacks.onVoiceStart }
-      );
+        // Só abre a barra no rádio com o clipe pronto em memória!
+        callbacks.onStart?.(clip.text);
+        // Toca o bipe oficial
+        await mobileAudioPlayer.playRadioBeep();
+        // Toca o áudio autêntico oficial do Puck
+        await mobileAudioPlayer.playAsset(
+          clip.asset,
+          clip.envelope,
+          clip.durationMs,
+          { onPlaybackStart: callbacks.onVoiceStart }
+        );
+      }
 
-      return { message: clip.text, tone: 'celebratory', priority: 'HIGH', category: eventScenario };
+      return { message: finalMessage, tone: 'celebratory', priority: 'HIGH', category: eventScenario };
     } catch (err) {
-      console.warn('[ClaudinhoMobile] Erro na transmissão do rádio:', err);
+      console.warn('[ClaudinhoMobile] Erro durante a transmissão do rádio:', err);
       return { message: '', tone: 'calm', priority: 'LOW', category: eventScenario };
     } finally {
       this.isTransmitting = false;
