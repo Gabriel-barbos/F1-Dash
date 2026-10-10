@@ -101,8 +101,43 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
 
     detector.evaluate(
       { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, pitStatus: PitStatus.Pitting, pitLimiterActive: true },
-      (sc) => { triggeredScenario = sc; }
+    (sc) => { triggeredScenario = sc; }
     );
     assert.strictEqual(triggeredScenario, 'PIT_LANE', 'Deve disparar PIT_LANE');
+  });
+
+  test('deve disparar GAP_UPDATE ao completar volta com gap pro carro da frente', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 3, deltaToCarInFrontInMS: 1500 },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 4, deltaToCarInFrontInMS: 1400 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'GAP_UPDATE', 'Deve disparar GAP_UPDATE');
+  });
+
+  test('deve disparar CALM_RACE após período de silêncio com carro em velocidade', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 120 },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    // Simula passagem de 50 segundos forçando o relógio interno
+    (detector as any).lastGlobalTriggerTime = Date.now() - 50000;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 180 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'CALM_RACE', 'Deve disparar CALM_RACE');
   });
 });

@@ -203,9 +203,10 @@ export class RaceEngineerDetector {
     const curLap = state.currentLapNum ?? 0;
     const lastLapTime = state.lastLapTimeInMS ?? 0;
     const bestLapTime = state.bestLapTimeInMS ?? 0;
+    const isNewLap = curLap > this.prevLapNum && this.prevLapNum > 0;
 
     if (
-      curLap > this.prevLapNum &&
+      isNewLap &&
       lastLapTime > 0 &&
       bestLapTime > 0 &&
       lastLapTime <= bestLapTime
@@ -229,6 +230,22 @@ export class RaceEngineerDetector {
         if (canSpeakScenario('TYRE_WEAR', 45000)) {
           trigger('TYRE_WEAR', 45000);
         }
+      }
+    }
+
+    // 9. TEMPO DE OUTROS PILOTOS / GAP (a cada volta completada com gap relevante para o carro da frente)
+    const gapFrontMS = state.deltaToCarInFrontInMS ?? 0;
+    if (isNewLap && gapFrontMS > 0) {
+      if (canSpeakScenario('GAP_UPDATE', 40000)) {
+        trigger('GAP_UPDATE', 40000);
+      }
+    }
+
+    // 10. MOMENTO MONÓTONO / CALMARIA / PIADA (ritmo de cruzeiro > 80km/h sem incidentes por 45s)
+    const speed = state.speed ?? 0;
+    if (speed > 80 && now - this.lastGlobalTriggerTime >= 45000) {
+      if (canSpeakScenario('CALM_RACE', 45000)) {
+        trigger('CALM_RACE', 45000);
       }
     }
   }

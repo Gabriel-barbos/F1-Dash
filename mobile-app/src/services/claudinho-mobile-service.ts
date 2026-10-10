@@ -52,6 +52,18 @@ const SCENARIO_FALLBACKS: Record<string, string[]> = {
   TYRE_WEAR: [
     'Esses pneus tão no osso, porra! Mais de 70% de desgaste, segura na curva!',
     'Cuidado com a tração, caralho, os pneus tão só o farelo!'
+  ],
+  CALM_RACE: [
+    'Tá tão calmo que parece passeio de domingo, Gabriel! Anda logo com essa lata velha!',
+    'Tudo sussa por aqui, Gabriel. Só não vai dormir no volante, caralho!',
+    'Pista limpa na sua frente, hein? Vê se não inventa moda e mantém o ritmo, moleque!',
+    'A resenha tá boa mas acelera essa porra, Gabriel! O chefe tá olhando!',
+    'Ótimo ritmo, moleque! Continua virando volta limpa e foca na corrida!'
+  ],
+  GAP_UPDATE: [
+    'O cara da frente tá logo ali, Gabriel! Tira essa diferença, caralho!',
+    'Cola na asa dele, porra! Tá a menos de dois segundos, bota pressão!',
+    'Diferença pro carro da frente caindo, Gabriel! Mantém o pé que você engole ele!'
   ]
 };
 
