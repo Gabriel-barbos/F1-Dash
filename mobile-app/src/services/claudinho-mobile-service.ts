@@ -1,4 +1,4 @@
-﻿import { mobileAudioPlayer } from './mobile-audio-player';
+import { mobileAudioPlayer } from './mobile-audio-player';
 
 const API_KEY = 'AQ.Ab8RN6LgIEBTDjoOU0k7dj_BYMD9Slh6fjVUuZWpuS82HOCyyA';
 
@@ -40,6 +40,18 @@ const SCENARIO_FALLBACKS: Record<string, string[]> = {
   START: [
     'Luzes apagadas, acelera essa porra! Pra cima deles, Gabriel!',
     'Bora Gabriel, largada perfeita! Traciona e fecha a porta na 1!'
+  ],
+  RED_FLAG: [
+    'Bandeira vermelha, caralho! Sessão suspensa, traz o carro pro box devagar!',
+    'Red flag na pista, porra! Reduz o ritmo e entra direto no pit lane!'
+  ],
+  POSITION_LOST: [
+    'Puta que pariu, tomou passada! Foco na retomada, Gabriel, vai pra cima!',
+    'Perdeu posição, caralho! Não deixa ele abrir, cola na asa dele!'
+  ],
+  TYRE_WEAR: [
+    'Esses pneus tão no osso, porra! Mais de 70% de desgaste, segura na curva!',
+    'Cuidado com a tração, caralho, os pneus tão só o farelo!'
   ]
 };
 

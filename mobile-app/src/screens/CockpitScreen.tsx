@@ -41,6 +41,7 @@ import { TeamRadioBanner } from '../components/momentary/TeamRadioBanner';
 import { Radio } from 'lucide-react-native';
 import { F1Font } from '../theme/typography';
 import { claudinhoMobileService } from '../services/claudinho-mobile-service';
+import { raceEngineerDetector } from '../services/race-engineer-detector';
 
 interface CockpitScreenProps {
   onNavigateToMenu?: () => void;
@@ -61,6 +62,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const [isRadioTransmitting, setIsRadioTransmitting] = useState<boolean>(false);
   const [radioPhase, setRadioPhase] = useState<'connecting' | 'live'>('connecting');
   const [radioVoice, setRadioVoice] = useState<{ envelope: number[]; startedAt: number } | null>(null);
+  const isRadioTransmittingRef = useRef<boolean>(false);
 
   // Tema visual ativo — recalculado apenas quando campos de estado mudam, não a cada frame
   const theme = useCockpitTheme(telemetry);
@@ -68,6 +70,47 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   // Track previous states to trigger momentary alerts only on state changes
   const prevSafetyCar = useRef<SafetyCarStatus>(SafetyCarStatus.None);
   const prevRedFlag = useRef<boolean>(false);
+
+  const handleTriggerClaudinhoRadio = (scenarioOverride?: string) => {
+    if (isRadioTransmittingRef.current) return;
+    isRadioTransmittingRef.current = true;
+    setIsRadioTransmitting(true);
+    setRadioPhase('connecting');
+    setRadioVoice(null);
+
+    const validScenario = typeof scenarioOverride === 'string' ? scenarioOverride : undefined;
+    const scenario = validScenario || (currentScenario === 'NORMAL' ? 'OVERTAKE' : currentScenario);
+
+    claudinhoMobileService.triggerRadio(
+      scenario,
+      'Gabriel',
+      {
+        onStart: () => {
+          isRadioTransmittingRef.current = true;
+          setIsRadioTransmitting(true);
+          setRadioPhase('connecting');
+        },
+        onVoiceStart: ({ envelope, startedAt }) => {
+          setRadioPhase('live');
+          setRadioVoice({ envelope, startedAt });
+        },
+        onEnd: () => {
+          setTimeout(() => {
+            isRadioTransmittingRef.current = false;
+            setIsRadioTransmitting(false);
+            setRadioVoice(null);
+            setRadioPhase('connecting');
+          }, 350);
+        }
+      }
+    ).catch(() => {
+      isRadioTransmittingRef.current = false;
+      setIsRadioTransmitting(false);
+    });
+  };
+
+  const triggerRadioRef = useRef(handleTriggerClaudinhoRadio);
+  triggerRadioRef.current = handleTriggerClaudinhoRadio;
 
   useEffect(() => {
     if (initialMomentaryOverlay) {
@@ -80,6 +123,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   }, [initialMomentaryOverlay]);
 
   useEffect(() => {
+    // Reinicia rastreamento do detector ao montar ou trocar de modo
+    raceEngineerDetector.reset();
+
     const unsubscribe = telemetryService.subscribe((state) => {
       setTelemetry({ ...state });
 
@@ -100,11 +146,16 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         setActiveMomentaryOverlay('RED_FLAG');
       }
       prevRedFlag.current = !!state.isRedFlagActive;
+
+      // Claudinho Ronaldo avalia a telemetria automaticamente a cada pacote
+      raceEngineerDetector.evaluate(state, (detectedScenario) => {
+        triggerRadioRef.current(detectedScenario);
+      });
     });
 
     const unsubMomentary = telemetryService.subscribeMomentaryEvent((event) => {
       if (event === 'TEAM_RADIO') {
-        handleTriggerClaudinhoRadio();
+        triggerRadioRef.current();
       } else {
         setActiveMomentaryOverlay(event);
       }
@@ -120,6 +171,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     setCurrentScenario(scenario);
     setActiveMomentaryOverlay(null);
     telemetryService.forceStateScenario(scenario);
+    if (scenario !== 'NORMAL') {
+      handleTriggerClaudinhoRadio(scenario);
+    }
   };
 
   const handleConnectionPress = () => {
@@ -137,37 +191,6 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     setActiveMomentaryOverlay(null);
     // Ao fechar tela momentânea, retorna o estado do simulador para a corrida normal
     telemetryService.forceStateScenario('NORMAL');
-  };
-
-  const handleTriggerClaudinhoRadio = () => {
-    if (isRadioTransmitting) return;
-    setIsRadioTransmitting(true);
-    setRadioPhase('connecting');
-    setRadioVoice(null);
-
-    const scenario = currentScenario === 'NORMAL' ? 'OVERTAKE' : currentScenario;
-
-    claudinhoMobileService.triggerRadio(
-      scenario,
-      'Gabriel',
-      {
-        onStart: () => {
-          setIsRadioTransmitting(true);
-          setRadioPhase('connecting');
-        },
-        onVoiceStart: ({ envelope, startedAt }) => {
-          setRadioPhase('live');
-          setRadioVoice({ envelope, startedAt });
-        },
-        onEnd: () => {
-          setTimeout(() => {
-            setIsRadioTransmitting(false);
-            setRadioVoice(null);
-            setRadioPhase('connecting');
-          }, 350);
-        }
-      }
-    );
   };
 
   const hasCriticalDamage =
@@ -253,7 +276,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                     gap: 5
                   }
                 ]}
-                onPress={handleTriggerClaudinhoRadio}
+                onPress={() => handleTriggerClaudinhoRadio()}
                 activeOpacity={0.7}
               >
                 <Radio size={12} color="#FF7043" />
