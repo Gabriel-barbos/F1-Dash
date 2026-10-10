@@ -74,9 +74,6 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const handleTriggerClaudinhoRadio = (scenarioOverride?: string) => {
     if (isRadioTransmittingRef.current) return;
     isRadioTransmittingRef.current = true;
-    setIsRadioTransmitting(true);
-    setRadioPhase('connecting');
-    setRadioVoice(null);
 
     const validScenario = typeof scenarioOverride === 'string' ? scenarioOverride : undefined;
     const scenario = validScenario || (currentScenario === 'NORMAL' ? 'OVERTAKE' : currentScenario);
@@ -86,9 +83,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       'Gabriel',
       {
         onStart: () => {
-          isRadioTransmittingRef.current = true;
           setIsRadioTransmitting(true);
           setRadioPhase('connecting');
+          setRadioVoice(null);
         },
         onVoiceStart: ({ envelope, startedAt }) => {
           setRadioPhase('live');
@@ -112,9 +109,6 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const handleTriggerClaudinhoDirect = (scenario: string, text: string, wavBase64?: string) => {
     if (isRadioTransmittingRef.current) return;
     isRadioTransmittingRef.current = true;
-    setIsRadioTransmitting(true);
-    setRadioPhase('connecting');
-    setRadioVoice(null);
 
     claudinhoMobileService.playDirectRadio(
       scenario,
@@ -122,9 +116,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       wavBase64,
       {
         onStart: () => {
-          isRadioTransmittingRef.current = true;
           setIsRadioTransmitting(true);
           setRadioPhase('connecting');
+          setRadioVoice(null);
         },
         onVoiceStart: ({ envelope, startedAt }) => {
           setRadioPhase('live');
@@ -182,11 +176,6 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
         setActiveMomentaryOverlay('RED_FLAG');
       }
       prevRedFlag.current = !!state.isRedFlagActive;
-
-      // Claudinho Ronaldo avalia a telemetria automaticamente a cada pacote
-      raceEngineerDetector.evaluate(state, (detectedScenario) => {
-        triggerRadioRef.current(detectedScenario);
-      });
     });
 
     const unsubMomentary = telemetryService.subscribeMomentaryEvent((event, payload) => {

@@ -73,6 +73,58 @@ export class MobileAudioPlayer {
   }
 
   /**
+   * Toca um asset de áudio pré-renderizado do Claudinho (WAV com Puck + DSP de rádio).
+   * 0ms de delay de rede, sem risco de timeout ou voz robótica.
+   */
+  public async playAsset(
+    asset: any,
+    envelope: number[],
+    durationMs: number,
+    callbacks: VoicePlaybackCallbacks = {}
+  ): Promise<void> {
+    this.stopVoice();
+    if (!asset || !expoAudioModule?.createAudioPlayer) {
+      console.warn('[MobileAudioPlayer] Asset de áudio indisponível.');
+      return;
+    }
+
+    try {
+      await this.ensureAudioMode();
+      const player = expoAudioModule.createAudioPlayer(asset);
+      this.currentPlayer = player;
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          try {
+            sub?.remove?.();
+            player.remove?.();
+          } catch {}
+          if (this.currentPlayer === player) this.currentPlayer = null;
+          resolve();
+        };
+
+        const sub = player.addListener?.('playbackStatusUpdate', (status: any) => {
+          if (status?.didJustFinish) finish();
+        });
+
+        player.play();
+        callbacks.onPlaybackStart?.({
+          envelope,
+          durationMs,
+          startedAt: Date.now()
+        });
+
+        setTimeout(finish, durationMs + 1200);
+      });
+    } catch (err) {
+      console.error('[MobileAudioPlayer] Falha ao tocar asset:', err);
+    }
+  }
+
+  /**
    * Aplica o efeito de rádio (DSP em TS puro) no WAV do Gemini TTS e toca.
    * Nunca cai em voz robótica: sem WAV, apenas não fala.
    */

@@ -68,18 +68,18 @@ class TelemetryService {
     const store = TelemetryStore.getInstance();
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
-        const cockpitState = toCockpitTelemetryState(raceState);
-
-        // Avalia eventos de corrida em tempo real a cada pacote UDP sem throttling
-        raceEngineerDetector.evaluate(cockpitState, (scenario) => {
-          this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
-        });
-
         const now = Date.now();
-        // Limita a notificação pesada da UI para ~30 FPS (a cada 33ms) para manter o thread JS leve
+        // Limita a conversão pesada e notificação da UI para ~30 FPS (a cada 33ms) para manter o thread JS leve
         if (now - this.lastUiUpdate >= 33) {
           this.lastUiUpdate = now;
+          const cockpitState = toCockpitTelemetryState(raceState);
           this.currentState = cockpitState;
+
+          // Avalia eventos de corrida do Claudinho Ronaldo de forma cadenciada sem sobrecarregar o Hermes
+          raceEngineerDetector.evaluate(cockpitState, (scenario) => {
+            this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
+          });
+
           this.notify();
         }
       } else if (this.mode === 'UDP_NATIVE' && !raceState.connection.connected && this.currentState.connected) {

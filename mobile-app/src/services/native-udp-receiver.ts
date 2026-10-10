@@ -32,12 +32,25 @@ function peekPacketIdRaw(data: Uint8Array): number {
   return data[6];
 }
 
+// Intervalo mínimo em ms entre pacotes do mesmo tipo para descartar rajadas defasadas
+// Evita acúmulo de pacotes atrasados na fila de eventos do React Native / Hermes
+const PACKET_MIN_INTERVAL_MS: Record<number, number> = {
+  1: 250,  // Session (2 Hz) — no máx 4x por segundo
+  2: 12,   // LapData (60 Hz) — descarta pacotes duplicados/atrasados < 12ms
+  3: 0,    // Event — nunca descarta (eventos cruciais da corrida)
+  6: 12,   // CarTelemetry (60 Hz) — descarta pacotes atrasados < 12ms
+  7: 30,   // CarStatus (20 Hz) — máx 33x por segundo
+  10: 60,  // CarDamage (10 Hz) — máx 16x por segundo
+  16: 12,  // CarTelemetry2 (60 Hz) — máx 60x por segundo
+};
+
 export class NativeUdpReceiver {
   private socket: any = null;
   private subscription: any = null;
   private port: number;
   private isListening: boolean = false;
   private store: TelemetryStore;
+  private lastPacketTimes: Map<number, number> = new Map();
 
   constructor(port: number = 20777) {
     this.port = port;
@@ -75,6 +88,16 @@ export class NativeUdpReceiver {
             // antes de alocar qualquer objeto no parser. Apenas 1 leitura de byte.
             const packetId = peekPacketIdRaw(buffer);
             if (!COCKPIT_PACKET_IDS.has(packetId)) return;
+
+            // Filtro de rajada: se o mesmo tipo de pacote chegou muito rápido (fila nativa acumulada),
+            // descarta o antigo imediatamente sem alocar memória no Hermes.
+            const now = Date.now();
+            const minInterval = PACKET_MIN_INTERVAL_MS[packetId] ?? 0;
+            if (minInterval > 0) {
+              const lastTime = this.lastPacketTimes.get(packetId) ?? 0;
+              if (now - lastTime < minInterval) return;
+              this.lastPacketTimes.set(packetId, now);
+            }
 
             const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
             if (parsed) {
@@ -123,6 +146,14 @@ export class NativeUdpReceiver {
             // Filtro rápido: descarta pacotes que o cockpit não exibe
             const packetId = peekPacketIdRaw(buffer);
             if (!COCKPIT_PACKET_IDS.has(packetId)) return;
+
+            const now = Date.now();
+            const minInterval = PACKET_MIN_INTERVAL_MS[packetId] ?? 0;
+            if (minInterval > 0) {
+              const lastTime = this.lastPacketTimes.get(packetId) ?? 0;
+              if (now - lastTime < minInterval) return;
+              this.lastPacketTimes.set(packetId, now);
+            }
 
             const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
             if (parsed) {
