@@ -244,11 +244,19 @@ export class RaceEngineerDetector {
       }
     }
 
-    // 9. TEMPO DE OUTROS PILOTOS / GAP (a cada volta completada com gap relevante para o carro da frente)
+    // 9. TEMPO DE OUTROS PILOTOS / GAP (a cada volta completada com gap relevante para o carro da frente ou de trás)
     const gapFrontMS = state.deltaToCarInFrontInMS ?? 0;
-    if (isNewLap && gapFrontMS > 0) {
-      if (canSpeakScenario('GAP_UPDATE', 40000)) {
-        trigger('GAP_UPDATE', 40000);
+    const gapBehindMS = state.deltaToCarBehindInMS ?? 0;
+
+    if (isNewLap) {
+      if (gapBehindMS > 0 && gapBehindMS <= 1500) {
+        if (canSpeakScenario('GAP_BEHIND', 35000)) {
+          trigger('GAP_BEHIND', 35000);
+        }
+      } else if (gapFrontMS > 0 && gapFrontMS <= 2500) {
+        if (canSpeakScenario('GAP_UPDATE', 35000)) {
+          trigger('GAP_UPDATE', 35000);
+        }
       }
     }
 

@@ -59,6 +59,7 @@ export interface PacketLapData {
   header: PacketHeader;
   lapData: LapData[];
   playerLapData: LapData;
+  deltaToCarBehindInMS?: number;
   timeTrialPBCarIdx?: number;
   timeTrialRivalCarIdx?: number;
 }

@@ -90,6 +90,7 @@ export interface RaceState {
     sector3TimeMS: number;                // DERIVED: lastLap - S1 - S2
     currentSector: number;                // 0 = S1, 1 = S2, 2 = S3
     deltaToCarInFrontMS: number;
+    deltaToCarBehindMS: number;
     deltaToRaceLeaderMS: number;
     safetyCarDelta: number;
     lapInvalid: boolean;
@@ -211,6 +212,7 @@ export const INITIAL_RACE_STATE: RaceState = {
     sector3TimeMS: 0,
     currentSector: 0,
     deltaToCarInFrontMS: 0,
+    deltaToCarBehindMS: 0,
     deltaToRaceLeaderMS: 0,
     safetyCarDelta: 0,
     lapInvalid: false,
@@ -301,6 +303,7 @@ export interface CockpitTelemetryState {
   sector3TimeInMS: number;
   currentSector: number;
   deltaToCarInFrontInMS: number;
+  deltaToCarBehindInMS?: number;
   deltaToRaceLeaderInMS: number;
   safetyCarDelta: number;
   currentLapInvalid: boolean;
@@ -400,6 +403,7 @@ export function toCockpitTelemetryState(state: RaceState): CockpitTelemetryState
     sector3TimeInMS: state.timing.sector3TimeMS,
     currentSector: state.timing.currentSector,
     deltaToCarInFrontInMS: state.timing.deltaToCarInFrontMS,
+    deltaToCarBehindInMS: state.timing.deltaToCarBehindMS,
     deltaToRaceLeaderInMS: state.timing.deltaToRaceLeaderMS,
     safetyCarDelta: state.timing.safetyCarDelta,
     currentLapInvalid: state.timing.lapInvalid,

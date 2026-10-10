@@ -64,6 +64,11 @@ const SCENARIO_FALLBACKS: Record<string, string[]> = {
     'O cara da frente tá logo ali, Gabriel! Tira essa diferença, caralho!',
     'Cola na asa dele, porra! Tá a menos de dois segundos, bota pressão!',
     'Diferença pro carro da frente caindo, Gabriel! Mantém o pé que você engole ele!'
+  ],
+  GAP_BEHIND: [
+    'Atenção Gabriel, o cara de trás tá com asa aberta e colando! Fecha a porta!',
+    'Olha o retrovisor, ele tá a menos de um segundo! Traciona forte nessa saída!',
+    'O cara de trás tá babando no seu câmbio, porra! Mantém a linha interna e não dá espaço!'
   ]
 };
 

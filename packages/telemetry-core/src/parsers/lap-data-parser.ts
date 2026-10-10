@@ -30,11 +30,32 @@ export class LapDataParser {
     const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
     let playerLapData: LapData;
+    let deltaToCarBehindInMS = 0;
 
     if (options.playerOnly) {
       const startPayloadOffset = reader.getOffset();
       reader.setOffset(startPayloadOffset + playerIndex * detectedEntrySize);
       playerLapData = LapDataParser.parseLapDataEntry(reader);
+
+      // Localiza o carro de trás (posição = playerPosition + 1) diretamente no buffer sem alocar objetos
+      const playerPos = playerLapData.carPosition;
+      if (playerPos > 0 && playerPos < numCars) {
+        for (let i = 0; i < numCars; i++) {
+          if (i === playerIndex) continue;
+          const entryOffset = startPayloadOffset + i * detectedEntrySize;
+          reader.setOffset(entryOffset + 32); // byte de carPosition
+          if (reader.hasRemaining(1) && reader.readUInt8() === playerPos + 1) {
+            reader.setOffset(entryOffset + 14); // lê deltaToCarInFront desse carro (distância até nós)
+            if (reader.hasRemaining(3)) {
+              const msPart = reader.readUInt16LE();
+              const minPart = reader.readUInt8();
+              deltaToCarBehindInMS = (minPart * 60000) + msPart;
+            }
+            break;
+          }
+        }
+      }
+
       reader.setOffset(startPayloadOffset + numCars * detectedEntrySize);
       lapData.push(playerLapData);
     } else {
@@ -53,6 +74,14 @@ export class LapDataParser {
         playerIndex >= 0 && playerIndex < lapData.length
           ? lapData[playerIndex]
           : (lapData[0] || LapDataParser.createEmpty());
+
+      const playerPos = playerLapData.carPosition;
+      if (playerPos > 0 && playerPos < numCars) {
+        const carBehind = lapData.find((l) => l.carPosition === playerPos + 1);
+        if (carBehind) {
+          deltaToCarBehindInMS = carBehind.deltaToCarInFrontInMS;
+        }
+      }
     }
 
     const timeTrialPBCarIdx = reader.hasRemaining(1) ? reader.readUInt8() : 255;
@@ -62,6 +91,7 @@ export class LapDataParser {
       header,
       lapData,
       playerLapData,
+      deltaToCarBehindInMS,
       timeTrialPBCarIdx,
       timeTrialRivalCarIdx
     };

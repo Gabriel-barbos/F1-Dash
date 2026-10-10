@@ -141,6 +141,22 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
     assert.strictEqual(triggeredScenario, 'GAP_UPDATE', 'Deve disparar GAP_UPDATE');
   });
 
+  test('deve disparar GAP_BEHIND ao completar volta com carro colado atrás (< 1.5s)', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 3, deltaToCarBehindInMS: 850 },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 4, deltaToCarBehindInMS: 850 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'GAP_BEHIND', 'Deve disparar GAP_BEHIND');
+  });
+
   test('deve disparar CALM_RACE após período de silêncio com carro em velocidade', () => {
     const detector = new RaceEngineerDetector();
     let triggeredScenario: string | null = null;

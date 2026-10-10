@@ -127,6 +127,7 @@ export class RaceStateNormalizer {
         this.state.timing.sector2TimeMS = lap.sector2TimeInMS;
         this.state.timing.currentSector = lap.sector;
         this.state.timing.deltaToCarInFrontMS = lap.deltaToCarInFrontInMS;
+        this.state.timing.deltaToCarBehindMS = parsed.data.deltaToCarBehindInMS ?? 0;
         this.state.timing.deltaToRaceLeaderMS = lap.deltaToRaceLeaderInMS;
         this.state.timing.safetyCarDelta = lap.safetyCarDelta;
         this.state.timing.lapInvalid = lap.currentLapInvalid;
