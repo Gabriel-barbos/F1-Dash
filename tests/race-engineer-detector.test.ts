@@ -175,4 +175,50 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
     );
     assert.strictEqual(triggeredScenario, 'CALM_RACE', 'Deve disparar CALM_RACE');
   });
+
+  test('deve limitar acionamentos do engenheiro a no máximo 2 vezes por volta e resetar na volta seguinte', () => {
+    const detector = new RaceEngineerDetector({ cooldownOvertakeMs: 0, cooldownDamageMs: 0, cooldownGlobalMs: 0 });
+    const triggered: string[] = [];
+
+    // Base: Volta 5, P5
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 5, frontLeftWingDamage: 0 },
+      (sc) => { triggered.push(sc); }
+    );
+
+    // 1º Acionamento na volta 5: Ultrapassagem para P4
+    (detector as any).lastGlobalTriggerTime = 0;
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 4, frontLeftWingDamage: 0 },
+      (sc) => { triggered.push(sc); }
+    );
+    assert.strictEqual(triggered.length, 1);
+    assert.strictEqual(triggered[0], 'OVERTAKE');
+
+    // 2º Acionamento na volta 5: Dano na asa
+    (detector as any).lastGlobalTriggerTime = 0;
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 4, frontLeftWingDamage: 15 },
+      (sc) => { triggered.push(sc); }
+    );
+    assert.strictEqual(triggered.length, 2);
+    assert.strictEqual(triggered[1], 'DAMAGE');
+
+    // 3º Evento na MESMA volta (volta 5): Ultrapassagem para P3 -> DEVE SER BLOQUEADO (máx 2 por volta)
+    (detector as any).lastGlobalTriggerTime = 0;
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 3, frontLeftWingDamage: 15 },
+      (sc) => { triggered.push(sc); }
+    );
+    assert.strictEqual(triggered.length, 2, '3º acionamento na mesma volta deve ser suprimido');
+
+    // Transição para Volta 6: O limite deve resetar!
+    (detector as any).lastGlobalTriggerTime = 0;
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 6, carPosition: 2, frontLeftWingDamage: 15 },
+      (sc) => { triggered.push(sc); }
+    );
+    assert.strictEqual(triggered.length, 3, 'Na volta seguinte a cota de 1-2 acionamentos deve resetar');
+    assert.strictEqual(triggered[2], 'OVERTAKE');
+  });
 });

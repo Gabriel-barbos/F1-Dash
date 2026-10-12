@@ -1,16 +1,21 @@
 /**
- * ModeTransitionBar — Barra Superior de Transição de Modo e Estado de Corrida
+ * ModeTransitionBar — Banner Superior de Estado de Corrida (estilo F1 TV)
  *
- * Barra de estado proeminente, grande e visível para motorsport:
- * - Ocupa destaque na parte superior da tela para leitura instantânea durante a corrida
- * - Ícones vetoriais de alta visibilidade (sem emojis)
- * - Versões completas para Bandeira Vermelha, Safety Car, VSC, Overtake, Modo Reta, Boxes, etc.
- * - Modo Normal: Marcador discreto e silencioso no centro
- * - Animações Reanimated 100% nativas
+ * Linguagem visual dos gráficos de transmissão da Fórmula 1:
+ * - Painel escuro (#15151E) com cantos retos e fio de acento na cor do estado
+ * - Tag colorida inclinada (paralelogramo) com ícone de alto contraste
+ * - Tipografia Titillium Black Italic (título) + SemiBold (subtítulo)
+ * - Indicador vivo à direita: chevrons (Overtake / Reta), gotas (Chuva), pulso (alertas)
+ *
+ * Coreografia (Reanimated, UI thread):
+ * - Entrada: tag desliza → painel faz wipe da esquerda → textos escalonados → shimmer
+ * - Troca:   flash na tag + texto sai/entra
+ * - Saída:   ordem inversa, retendo o último estado até o fim da animação
+ * - Modo Normal: marcador discreto no centro
  */
 
-import React, { useEffect, useRef, memo } from 'react';
-import { StyleSheet, Text, View, Platform } from 'react-native';
+import React, { useEffect, memo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,300 +37,240 @@ import {
   CloudRain,
 } from 'lucide-react-native';
 import { CockpitTheme, CockpitStateKey } from '../theme/types';
+import { F1Font } from '../../theme/typography';
+import {
+  F1_PANEL,
+  SlantTag,
+  Chevrons,
+  RainDrops,
+  PulseBlock,
+  Shimmer,
+  useBannerTransition,
+  withAlpha,
+} from './f1Banner';
 
 interface ModeTransitionBarProps {
   theme: CockpitTheme;
 }
 
+type LiveIndicator = 'chevrons' | 'rain' | 'pulse' | 'none';
+
 interface ModeVisualConfig {
+  /** Código curto exibido à direita (estilo F1 TV) */
+  code: string;
   title: string;
   subtitle: string;
   IconComponent: React.ComponentType<any>;
-  background: [string, string];
-  textColor: string;
-  subTextColor: string;
-  iconBg: string;
+  /** Cor do estado (tag, acento, indicador) */
+  color: string;
+  /** Cor do ícone sobre a tag */
   iconColor: string;
-  borderColor: string;
-  shadowColor: string;
+  indicator: LiveIndicator;
+  critical: boolean;
 }
 
 const getModeVisualConfig = (theme: CockpitTheme): ModeVisualConfig => {
   switch (theme.key) {
     case CockpitStateKey.RED_FLAG:
       return {
+        code: 'RED FLAG',
         title: 'BANDEIRA VERMELHA · SESSÃO SUSPENSA',
         subtitle: 'REDUZA VELOCIDADE · RETORNO OBRIGATÓRIO AOS BOXES',
         IconComponent: Flag,
-        background: ['#ef4444', '#dc2626'],
-        textColor: '#ffffff',
-        subTextColor: '#fee2e2',
-        iconBg: '#ffffff',
-        iconColor: '#dc2626',
-        borderColor: '#fca5a5',
-        shadowColor: '#ef4444',
+        color: '#E10600',
+        iconColor: '#ffffff',
+        indicator: 'pulse',
+        critical: true,
       };
     case CockpitStateKey.SAFETY_CAR:
       return {
-        title: 'SAFETY CAR (SC) NA PISTA',
+        code: 'SC',
+        title: 'SAFETY CAR NA PISTA',
         subtitle: 'VELOCIDADE CONTROLADA · MANTENHA DELTA POSITIVO',
         IconComponent: ShieldAlert,
-        background: ['#facc15', '#eab308'],
-        textColor: '#000000',
-        subTextColor: '#261b00',
-        iconBg: '#000000',
-        iconColor: '#facc15',
-        borderColor: '#fef08a',
-        shadowColor: '#eab308',
+        color: '#FFD12E',
+        iconColor: '#15151E',
+        indicator: 'pulse',
+        critical: true,
       };
     case CockpitStateKey.VSC:
       return {
-        title: 'VIRTUAL SAFETY CAR (VSC)',
+        code: 'VSC',
+        title: 'VIRTUAL SAFETY CAR',
         subtitle: 'PROIBIDO ULTRAPASSAR · RESPEITE TEMPO DELTA',
         IconComponent: ShieldAlert,
-        background: ['#fb923c', '#ea580c'],
-        textColor: '#000000',
-        subTextColor: '#2b1100',
-        iconBg: '#000000',
-        iconColor: '#fb923c',
-        borderColor: '#fed7aa',
-        shadowColor: '#ea580c',
+        color: '#FF8700',
+        iconColor: '#15151E',
+        indicator: 'pulse',
+        critical: true,
       };
     case CockpitStateKey.OVERTAKE:
       return {
-        title: 'MODO OVERTAKE ATIVADO',
+        code: 'OVTK',
+        title: 'OVERTAKE ATIVADO',
         subtitle: 'POTÊNCIA MÁXIMA ERS · ULTRAPASSAGEM LIBERADA',
         IconComponent: Zap,
-        background: ['#3b82f6', '#1d4ed8'],
-        textColor: '#ffffff',
-        subTextColor: '#dbeafe',
-        iconBg: '#ffffff',
-        iconColor: '#1d4ed8',
-        borderColor: '#93c5fd',
-        shadowColor: '#3b82f6',
+        color: '#2F80FF',
+        iconColor: '#ffffff',
+        indicator: 'chevrons',
+        critical: false,
       };
     case CockpitStateKey.STRAIGHT_MODE:
       return {
-        title: 'MODO RETA · ACTIVE AERO (X-MODE)',
+        code: 'X-MODE',
+        title: 'MODO RETA · ACTIVE AERO',
         subtitle: 'CONFIGURAÇÃO DE BAIXO ARRASTO · ASA ABERTA',
         IconComponent: Wind,
-        background: ['#a855f7', '#7e22ce'],
-        textColor: '#ffffff',
-        subTextColor: '#f3e8ff',
-        iconBg: '#ffffff',
-        iconColor: '#7e22ce',
-        borderColor: '#d8b4fe',
-        shadowColor: '#a855f7',
+        color: '#9D5CFF',
+        iconColor: '#ffffff',
+        indicator: 'chevrons',
+        critical: false,
       };
     case CockpitStateKey.PIT_LANE:
       return {
-        title: 'PIT LANE · LIMITADOR 80 KM/H ATIVO',
+        code: 'PIT',
+        title: 'PIT LANE · LIMITADOR 80 KM/H',
         subtitle: 'CONTROLE AUTOMÁTICO DE VELOCIDADE LIGADO',
         IconComponent: Wrench,
-        background: ['#ec4899', '#be185d'],
-        textColor: '#ffffff',
-        subTextColor: '#fce7f3',
-        iconBg: '#ffffff',
-        iconColor: '#be185d',
-        borderColor: '#f9a8d4',
-        shadowColor: '#ec4899',
+        color: '#FF2E93',
+        iconColor: '#ffffff',
+        indicator: 'none',
+        critical: false,
       };
     case CockpitStateKey.FASTEST_LAP:
       return {
-        title: 'VOLTA MAIS RÁPIDA DA CORRIDA',
+        code: 'FL',
+        title: 'VOLTA MAIS RÁPIDA',
         subtitle: 'NOVO RECORDE DA SESSÃO CONQUISTADO',
         IconComponent: Timer,
-        background: ['#06b6d4', '#0891b2'],
-        textColor: '#000000',
-        subTextColor: '#042f2e',
-        iconBg: '#000000',
-        iconColor: '#06b6d4',
-        borderColor: '#a5f3fc',
-        shadowColor: '#06b6d4',
+        color: '#C13BFF',
+        iconColor: '#ffffff',
+        indicator: 'none',
+        critical: false,
       };
     case CockpitStateKey.WET_TRACK:
       return {
-        title: 'PISTA MOLHADA · CONDIÇÃO DE CHUVA',
+        code: 'WET',
+        title: 'PISTA MOLHADA',
         subtitle: 'ADERÊNCIA REDUZIDA · CUIDADO NAS FRENAGENS',
         IconComponent: CloudRain,
-        background: ['#0284c7', '#0369a1'],
-        textColor: '#ffffff',
-        subTextColor: '#e0f2fe',
-        iconBg: '#ffffff',
-        iconColor: '#0284c7',
-        borderColor: '#7dd3fc',
-        shadowColor: '#0284c7',
+        color: '#1FA3FF',
+        iconColor: '#ffffff',
+        indicator: 'rain',
+        critical: false,
       };
     case CockpitStateKey.FORMATION_LAP:
       return {
+        code: 'START',
         title: 'PROCEDIMENTO DE LARGADA',
         subtitle: 'VOLTA DE APRESENTAÇÃO · ALINHAMENTO NO GRID',
         IconComponent: FlagTriangleRight,
-        background: ['#f8fafc', '#cbd5e1'],
-        textColor: '#000000',
-        subTextColor: '#334155',
-        iconBg: '#000000',
-        iconColor: '#ffffff',
-        borderColor: '#e2e8f0',
-        shadowColor: '#94a3b8',
+        color: '#F1F5F9',
+        iconColor: '#15151E',
+        indicator: 'none',
+        critical: false,
       };
     default:
       return {
+        code: '',
         title: theme.label || 'SISTEMA ATIVO',
         subtitle: 'TELEMETRIA EM PISTA',
         IconComponent: Zap,
-        background: [theme.accent || '#3b82f6', theme.cardBorder || '#1d4ed8'],
-        textColor: theme.badgeTextColor || '#ffffff',
-        subTextColor: theme.badgeTextColor === '#000000' ? '#1f2937' : '#e2e8f0',
-        iconBg: theme.badgeTextColor === '#000000' ? '#000000' : '#ffffff',
-        iconColor: theme.accent || '#3b82f6',
-        borderColor: theme.accent || '#3b82f6',
-        shadowColor: theme.accent || '#3b82f6',
+        color: theme.accent || '#3b82f6',
+        iconColor: theme.badgeTextColor || '#ffffff',
+        indicator: 'none',
+        critical: false,
       };
   }
 };
 
-export const ModeTransitionBar: React.FC<ModeTransitionBarProps> = memo(({ theme }) => {
-  const isNormal = theme.key === CockpitStateKey.NORMAL;
-  const prevKeyRef = useRef(theme.key);
-
-  // Reanimated shared values
-  const scaleX = useSharedValue(isNormal ? 0.05 : 1);
-  const opacity = useSharedValue(isNormal ? 0 : 1);
-  const pulseScale = useSharedValue(1);
-
+/** Acento inferior com pulso opcional para estados críticos */
+const AccentLine: React.FC<{ color: string; critical: boolean }> = ({ color, critical }) => {
+  const o = useSharedValue(1);
   useEffect(() => {
-    const prevKey = prevKeyRef.current;
-    prevKeyRef.current = theme.key;
-
-    if (isNormal) {
-      // Retração suave para modo normal
-      scaleX.value = withTiming(0.05, {
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-      });
-      opacity.value = withTiming(0, {
-        duration: 180,
-        easing: Easing.in(Easing.linear),
-      });
-    } else {
-      if (prevKey === CockpitStateKey.NORMAL) {
-        // Entrada do modo a partir do normal: expande do centro
-        scaleX.value = 0.05;
-        opacity.value = 0;
-
-        scaleX.value = withTiming(1, {
-          duration: 320,
-          easing: Easing.out(Easing.cubic),
-        });
-        opacity.value = withTiming(1, {
-          duration: 260,
-          easing: Easing.out(Easing.quad),
-        });
-      } else if (prevKey !== theme.key) {
-        // Transição entre dois modos ativos: transição elástica rápida
-        scaleX.value = withSequence(
-          withTiming(0.75, { duration: 90, easing: Easing.in(Easing.quad) }),
-          withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) })
-        );
-        opacity.value = withSequence(
-          withTiming(0.4, { duration: 90 }),
-          withTiming(1, { duration: 180 })
-        );
-      }
-    }
-  }, [theme.key, isNormal, scaleX, opacity]);
-
-  // Efeito de pulso para estados de alerta crítico
-  useEffect(() => {
-    cancelAnimation(pulseScale);
-    const isCritical =
-      theme.key === CockpitStateKey.RED_FLAG ||
-      theme.key === CockpitStateKey.SAFETY_CAR ||
-      theme.key === CockpitStateKey.VSC;
-
-    if (isCritical) {
-      pulseScale.value = withRepeat(
+    cancelAnimation(o);
+    if (critical) {
+      o.value = withRepeat(
         withSequence(
-          withTiming(1.025, { duration: 420, easing: Easing.inOut(Easing.quad) }),
-          withTiming(1.0, { duration: 420, easing: Easing.inOut(Easing.quad) })
+          withTiming(0.35, { duration: 420, easing: Easing.inOut(Easing.quad) }),
+          withTiming(1, { duration: 420, easing: Easing.inOut(Easing.quad) })
         ),
         -1,
-        true
+        false
       );
     } else {
-      pulseScale.value = withTiming(1, { duration: 150 });
+      o.value = withTiming(1, { duration: 150 });
     }
-  }, [theme.key, isNormal, pulseScale]);
+    return () => cancelAnimation(o);
+  }, [critical, o]);
+  const style = useAnimatedStyle(() => ({ opacity: o.value }));
+  return <Animated.View style={[styles.accentLine, { backgroundColor: color }, style]} />;
+};
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [
-      { scaleX: scaleX.value },
-      { scaleY: pulseScale.value },
-    ],
-  }));
+export const ModeTransitionBar: React.FC<ModeTransitionBarProps> = memo(({ theme }) => {
+  const isNormal = theme.key === CockpitStateKey.NORMAL;
+  const config = isNormal ? null : getModeVisualConfig(theme);
 
-  const {
-    title,
-    subtitle,
-    IconComponent,
-    background,
-    textColor,
-    subTextColor,
-    iconBg,
-    iconColor,
-    borderColor,
-    shadowColor,
-  } = getModeVisualConfig(theme);
+  const { shown, tagStyle, panelStyle, titleStyle, subStyle, flashStyle, shimmer } =
+    useBannerTransition<ModeVisualConfig>(isNormal ? null : theme.key, config);
 
   return (
     <View style={styles.outerContainer}>
       {/* Marcador discreto no modo normal */}
       {isNormal && (
-        <View style={styles.idleMarker}>
+        <View style={styles.idleMarker} pointerEvents="none">
           <View style={styles.idleLine} />
         </View>
       )}
 
-      {/* Barra de Estado Proeminente estilo Fórmula 1 */}
-      <Animated.View style={[styles.barWrapper, animatedStyle]}>
-        <LinearGradient
-          colors={background}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[
-            styles.barGradient,
-            {
-              borderColor,
-              shadowColor,
-            },
-          ]}
-        >
-          {/* Caixa de Ícone em Alto Contraste */}
-          <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-            <IconComponent size={22} color={iconColor} strokeWidth={3} />
-          </View>
+      {shown && (
+        <View style={styles.barWrapper}>
+          {/* Painel principal com wipe da esquerda */}
+          <Animated.View style={[styles.panel, panelStyle]}>
+            <LinearGradient
+              colors={[withAlpha(shown.color, 0.32), withAlpha(shown.color, 0.06), 'rgba(0,0,0,0)']}
+              locations={[0, 0.45, 1]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-          {/* Textos com Tipografia e Contraste Fórmula 1 */}
-          <View style={styles.textContainer}>
-            <Text
-              style={[styles.titleText, { color: textColor }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {title}
-            </Text>
-            <Text
-              style={[styles.subtitleText, { color: subTextColor }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {subtitle}
-            </Text>
-          </View>
-        </LinearGradient>
-      </Animated.View>
+            <View style={styles.tagSpacer} />
+
+            <View style={styles.textContainer}>
+              <Animated.Text style={[styles.titleText, titleStyle]} numberOfLines={1}>
+                {shown.title}
+              </Animated.Text>
+              <Animated.Text style={[styles.subtitleText, subStyle]} numberOfLines={1}>
+                {shown.subtitle}
+              </Animated.Text>
+            </View>
+
+            {/* Indicador vivo + código curto */}
+            <Animated.View style={[styles.rightBlock, titleStyle]}>
+              {shown.indicator === 'chevrons' && <Chevrons color={shown.color} size={17} />}
+              {shown.indicator === 'rain' && <RainDrops color={shown.color} size={20} />}
+              {shown.indicator === 'pulse' && <PulseBlock color={shown.color} size={9} />}
+              {!!shown.code && (
+                <View style={[styles.codeBox, { borderColor: withAlpha(shown.color, 0.55) }]}>
+                  <Text style={[styles.codeText, { color: shown.color }]}>{shown.code}</Text>
+                </View>
+              )}
+            </Animated.View>
+
+            <AccentLine color={shown.color} critical={shown.critical} />
+            <Shimmer progress={shimmer} />
+          </Animated.View>
+
+          {/* Tag inclinada com ícone (entra antes e sai por último) */}
+          <Animated.View style={[styles.tagContainer, tagStyle]}>
+            <SlantTag color={shown.color} width={50} height={40}>
+              <shown.IconComponent size={21} color={shown.iconColor} strokeWidth={2.8} />
+              <Animated.View style={[styles.tagFlash, flashStyle]} pointerEvents="none" />
+            </SlantTag>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 });
@@ -351,63 +296,87 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   barWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
     width: '92%',
     maxWidth: 660,
+    height: 44,
+    justifyContent: 'center',
   },
-  barGradient: {
+  panel: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 40,
     width: '100%',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.9,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: F1_PANEL,
+    borderRadius: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    paddingRight: 12,
+    transformOrigin: 'left center',
   },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3,
-    elevation: 3,
+  tagSpacer: {
+    width: 62,
   },
   textContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   titleText: {
-    fontFamily: Platform.select({
-      ios: 'HelveticaNeue-CondensedBlack',
-      android: 'sans-serif-condensed',
-      default: 'sans-serif',
-    }),
-    fontSize: 14,
-    fontWeight: '900',
+    color: '#ffffff',
+    fontFamily: F1Font.black,
+    fontSize: 15,
+    lineHeight: 18,
+    letterSpacing: 1.6,
     fontStyle: 'italic',
-    letterSpacing: 1.8,
-    textTransform: 'uppercase',
+    includeFontPadding: false,
   },
   subtitleText: {
-    fontFamily: Platform.select({
-      ios: 'HelveticaNeue-CondensedBold',
-      android: 'sans-serif-condensed',
-      default: 'sans-serif',
-    }),
+    color: '#9aa3b5',
+    fontFamily: F1Font.semi,
     fontSize: 9.5,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginTop: 1,
+    lineHeight: 12,
+    letterSpacing: 1.4,
+    includeFontPadding: false,
+  },
+  rightBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 10,
+  },
+  codeBox: {
+    borderWidth: 1,
+    borderRadius: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    transform: [{ skewX: '-10deg' }],
+  },
+  codeText: {
+    fontFamily: F1Font.black,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    includeFontPadding: false,
+  },
+  accentLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 2,
+  },
+  tagContainer: {
+    position: 'absolute',
+    left: 4,
+    top: 2,
+  },
+  tagFlash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#ffffff',
+    transform: [{ skewX: '-14deg' }],
+    borderRadius: 2,
   },
 });

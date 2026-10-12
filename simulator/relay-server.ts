@@ -42,6 +42,7 @@ let udpPacketCount = 0;
 let lastUdpPacketTime = 0;
 let currentUdpHz = 0;
 let lastHzCheck = Date.now();
+let lastDetectorEval = 0;
 
 udpSocket.on('error', (err) => {
   console.error('[UDP Error]', err);
@@ -57,11 +58,15 @@ udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
     if (parsed) {
       store.processPacket(parsed);
 
-      // Avalia eventos de corrida em tempo real diretamente no PC
-      const cockpit = store.getCockpitState();
-      detector.evaluate(cockpit, (scenario) => {
-        handleTriggerRadio(scenario, cockpit);
-      });
+      // Avalia eventos de corrida do detector de forma cadenciada (a cada 100ms)
+      const now = Date.now();
+      if (now - lastDetectorEval >= 100) {
+        lastDetectorEval = now;
+        const cockpit = store.getCockpitState();
+        detector.evaluate(cockpit, (scenario) => {
+          handleTriggerRadio(scenario, cockpit);
+        });
+      }
     }
   } catch (err) {
     // Silencia erros de pacotes corrompidos eventuais

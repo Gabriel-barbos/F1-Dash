@@ -69,8 +69,8 @@ class TelemetryService {
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
         const now = Date.now();
-        // Limita a conversão pesada e notificação da UI para ~30 FPS (a cada 33ms) para manter o thread JS leve
-        if (now - this.lastUiUpdate >= 33) {
+        // Notificação da UI em tempo real a 60 FPS (a cada 16ms) com thread JS otimizada
+        if (now - this.lastUiUpdate >= 16) {
           this.lastUiUpdate = now;
           const cockpitState = toCockpitTelemetryState(raceState);
           this.currentState = cockpitState;

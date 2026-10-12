@@ -29,6 +29,7 @@ export class RaceEngineerDetector {
 
   private lastGlobalTriggerTime: number = 0;
   private lastTriggerByScenario: Map<string, number> = new Map();
+  private triggersInCurrentLap: number = 0;
 
   private readonly cooldownDamageMs: number;
   private readonly cooldownOvertakeMs: number;
@@ -41,7 +42,7 @@ export class RaceEngineerDetector {
     this.cooldownOvertakeMs = options.cooldownOvertakeMs ?? 15000; // 15s entre ultrapassagens
     this.cooldownSafetyCarMs = options.cooldownSafetyCarMs ?? 20000; // 20s para safety car
     this.cooldownPitMs = options.cooldownPitMs ?? 25000; // 25s para pit lane
-    this.cooldownGlobalMs = options.cooldownGlobalMs ?? 5000; // Mínimo de 5s entre qualquer fala
+    this.cooldownGlobalMs = options.cooldownGlobalMs ?? 6000; // Mínimo de 6s entre falas consecutivas
   }
 
   public reset() {
@@ -59,10 +60,12 @@ export class RaceEngineerDetector {
     this.prevTyreWearThresholdNotified.clear();
     this.lastGlobalTriggerTime = 0;
     this.lastTriggerByScenario.clear();
+    this.triggersInCurrentLap = 0;
   }
 
   /**
    * Avalia o estado da telemetria e dispara o rádio automaticamente se um evento relevante for detectado.
+   * Regra estrita: Máximo de 1 a 2 acionamentos por volta (exceto bandeira vermelha ou safety car crítico).
    */
   public evaluate(
     state: CockpitTelemetryState,
@@ -88,6 +91,7 @@ export class RaceEngineerDetector {
     );
 
     const curSpeed = state.speed ?? 0;
+    const curLap = state.currentLapNum ?? 0;
     const now = Date.now();
 
     // Na primeira leitura de telemetria após conectar, apenas registra o estado base
@@ -100,16 +104,33 @@ export class RaceEngineerDetector {
       this.prevRedFlag = !!state.isRedFlagActive;
       this.prevPitStatus = state.pitStatus ?? PitStatus.None;
       this.prevPitLimiter = !!state.pitLimiterActive;
-      this.prevLapNum = state.currentLapNum ?? 0;
+      this.prevLapNum = curLap;
       this.prevBestLapTime = state.bestLapTimeInMS ?? 0;
       this.prevSpeed = curSpeed;
+      this.triggersInCurrentLap = 0;
       return;
+    }
+
+    // Reinicia cota de rádio a cada nova volta (1-2 falas por volta no máximo)
+    if (curLap > this.prevLapNum && this.prevLapNum > 0) {
+      this.triggersInCurrentLap = 0;
     }
 
     const canSpeakGlobally = now - this.lastGlobalTriggerTime >= this.cooldownGlobalMs;
 
     const canSpeakScenario = (scenario: string, cooldownMs: number): boolean => {
       if (!canSpeakGlobally) return false;
+
+      // Eventos de segurança crítica têm permissão para furar a cota de volta
+      const isCritical =
+        scenario === 'RED_FLAG' ||
+        scenario === 'SAFETY_CAR' ||
+        state.engineBlown === true;
+
+      if (!isCritical && this.triggersInCurrentLap >= 2) {
+        return false; // Respeita rigorosamente o limite de 1 a 2 vezes por volta
+      }
+
       const last = this.lastTriggerByScenario.get(scenario) ?? 0;
       return now - last >= cooldownMs;
     };
@@ -117,16 +138,20 @@ export class RaceEngineerDetector {
     const trigger = (scenario: string, cooldownMs: number) => {
       this.lastGlobalTriggerTime = now;
       this.lastTriggerByScenario.set(scenario, now);
+      this.triggersInCurrentLap++;
       onTrigger(scenario);
     };
 
     // 1. IMPACTO / BATIDA / NOVO DANO (Alta Prioridade)
     // Dispara se:
-    // a) O dano do carro subiu (>= 2% ou asa >= 2% ou motor estourou)
-    // b) Ou desaceleração brusca de choque contra barreira (estava a >= 50 km/h e caiu para <= 15 km/h sem freio completo)
+    // a) O dano do carro subiu (>= 3% ou asa >= 3% ou motor estourou)
+    // b) Ou desaceleração brusca de choque violento (estava a >= 50 km/h e despencou para <= 15 km/h sem freio total),
+    // ignorando parada normal de grid na volta de apresentação.
     const damageDelta = currentDamageSum - this.prevDamageSum;
     const wingDelta = maxWingDamage - this.prevMaxWingDamage;
+    const isFormationStop = state.safetyCarStatus === SafetyCarStatus.FormationLap || (curLap <= 1 && curSpeed === 0 && currentDamageSum === 0);
     const isSuddenImpact =
+      !isFormationStop &&
       this.prevSpeed >= 50 &&
       curSpeed <= 15 &&
       (state.brake ?? 0) < 0.85;
@@ -176,11 +201,11 @@ export class RaceEngineerDetector {
     // 5. ENTRADA DE BOX / LIMITADOR DE PIT
     const isPitting =
       state.pitStatus === PitStatus.Pitting ||
-      state.pitStatus === PitStatus.InPitLane ||
+      state.pitStatus === PitStatus.InPitArea ||
       state.pitLimiterActive;
     const wasPitting =
       this.prevPitStatus === PitStatus.Pitting ||
-      this.prevPitStatus === PitStatus.InPitLane ||
+      this.prevPitStatus === PitStatus.InPitArea ||
       this.prevPitLimiter;
 
     if (isPitting && !wasPitting) {
@@ -211,7 +236,6 @@ export class RaceEngineerDetector {
     }
 
     // 7. VOLTA MAIS RÁPIDA (Roxo na tela)
-    const curLap = state.currentLapNum ?? 0;
     const lastLapTime = state.lastLapTimeInMS ?? 0;
     const bestLapTime = state.bestLapTimeInMS ?? 0;
     const isNewLap = curLap > this.prevLapNum && this.prevLapNum > 0;

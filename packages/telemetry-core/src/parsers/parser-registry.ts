@@ -48,7 +48,7 @@ export class ParserRegistry {
         case PacketId.CarTelemetry2:
           return {
             type: PacketId.CarTelemetry2,
-            data: Telemetry2Parser.parse(buffer)
+            data: Telemetry2Parser.parse(buffer, options)
           };
 
         case PacketId.Session:

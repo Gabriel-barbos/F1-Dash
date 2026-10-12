@@ -25,6 +25,7 @@ import { SpeedDisplay } from './SpeedDisplay';
 import { InputBar } from './InputBars';
 import { DynamicStatusIndicator } from './DynamicStatusIndicator';
 import { WeatherIndicator } from './WeatherIndicator';
+import { F1Font } from '../../theme/typography';
 
 interface CentralCockpitProps {
   gear: number;
@@ -54,6 +55,7 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
   gear,
   speed,
   rpm,
+  maxRpm = 13500,
   revPercent,
   throttle,
   brake,
@@ -79,10 +81,12 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
 
   return (
     <View style={styles.container}>
-      {/* 1. Indicador de RPM em pontos reativos */}
+      {/* 1. Shift lights estilo volante F1 + barra linear de RPM */}
       <RpmIndicator
         revPercent={revPercent}
         palette={theme.shiftLights}
+        rpm={rpm}
+        maxRpm={maxRpm}
       />
 
       {/* 2. Leitura Numérica de RPM */}
@@ -96,7 +100,11 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
         <InputBar value={throttle} type="throttle" height={105} />
 
         <View style={styles.gearSpeedBlock}>
-          <GearDisplay gear={gear} />
+          <GearDisplay
+            gear={gear}
+            revPercent={revPercent}
+            shiftColor={theme.shiftLights?.peak || '#ffffff'}
+          />
           <SpeedDisplay speed={speed} />
         </View>
 
@@ -146,17 +154,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   rpmValue: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    fontWeight: '900',
+    color: '#e2e8f0',
+    fontFamily: F1Font.bold,
+    fontSize: 15,
     fontVariant: ['tabular-nums'],
-    letterSpacing: 0.8,
+    letterSpacing: 1,
+    includeFontPadding: false,
   },
   rpmLabel: {
     color: '#64748b',
-    fontSize: 8.5,
-    fontWeight: '800',
-    letterSpacing: 1,
+    fontFamily: F1Font.semi,
+    fontSize: 9,
+    letterSpacing: 2,
+    includeFontPadding: false,
   },
   instrumentRow: {
     flexDirection: 'row',

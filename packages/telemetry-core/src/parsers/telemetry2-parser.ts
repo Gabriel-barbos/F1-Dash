@@ -10,7 +10,10 @@ export class Telemetry2Parser {
    * Decodifica o pacote de Car Telemetry 2 (Packet ID 16 - Regulamento 2026).
    * Formato oficial: 269 bytes no total (Header 29b + 24 carros * 10b).
    */
-  public static parse(data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer }): PacketCarTelemetry2 {
+  public static parse(
+    data: ArrayBuffer | Uint8Array | DataView | { buffer: ArrayBuffer },
+    options: { playerOnly?: boolean } = {}
+  ): PacketCarTelemetry2 {
     const reader = new BinaryReader(data);
     const header = HeaderParser.parse(reader);
 
@@ -21,24 +24,34 @@ export class Telemetry2Parser {
     const payloadLength = reader.remainingBytes();
     // No formato oficial do F1 25, cada entrada de carro tem 10 bytes
     const entrySize = payloadLength >= numCars * 10 ? 10 : Math.max(4, Math.floor(payloadLength / numCars));
+    const playerIndex = header.playerCarIndex >= 0 && header.playerCarIndex < numCars ? header.playerCarIndex : 0;
 
-    for (let i = 0; i < numCars; i++) {
-      if (!reader.hasRemaining(4)) break;
-      const startOffset = reader.getOffset();
-      const entry = Telemetry2Parser.parseTelemetry2Entry(reader);
-      carTelemetryData2.push(entry);
+    let playerCarTelemetry2: CarTelemetryData2;
 
-      const bytesRead = reader.getOffset() - startOffset;
-      if (bytesRead < entrySize && reader.hasRemaining(entrySize - bytesRead)) {
-        reader.skip(entrySize - bytesRead);
+    if (options.playerOnly) {
+      const startPayloadOffset = reader.getOffset();
+      reader.setOffset(startPayloadOffset + playerIndex * entrySize);
+      playerCarTelemetry2 = Telemetry2Parser.parseTelemetry2Entry(reader);
+      reader.setOffset(startPayloadOffset + numCars * entrySize);
+      carTelemetryData2.push(playerCarTelemetry2);
+    } else {
+      for (let i = 0; i < numCars; i++) {
+        if (!reader.hasRemaining(4)) break;
+        const startOffset = reader.getOffset();
+        const entry = Telemetry2Parser.parseTelemetry2Entry(reader);
+        carTelemetryData2.push(entry);
+
+        const bytesRead = reader.getOffset() - startOffset;
+        if (bytesRead < entrySize && reader.hasRemaining(entrySize - bytesRead)) {
+          reader.skip(entrySize - bytesRead);
+        }
       }
-    }
 
-    const playerIndex = header.playerCarIndex;
-    const playerCarTelemetry2 =
-      playerIndex >= 0 && playerIndex < carTelemetryData2.length
-        ? carTelemetryData2[playerIndex]
-        : (carTelemetryData2[0] || Telemetry2Parser.createEmpty());
+      playerCarTelemetry2 =
+        playerIndex >= 0 && playerIndex < carTelemetryData2.length
+          ? carTelemetryData2[playerIndex]
+          : (carTelemetryData2[0] || Telemetry2Parser.createEmpty());
+    }
 
     return {
       header,

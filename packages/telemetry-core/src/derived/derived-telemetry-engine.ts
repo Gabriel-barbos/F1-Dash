@@ -76,22 +76,22 @@ export class DerivedTelemetryEngine {
     if (this.initialFuelInTank !== null && inputs.currentLap > 1) {
       const lapsCompleted = inputs.currentLap - 1;
       const fuelUsed = Math.max(0, this.initialFuelInTank - inputs.fuelInTank);
-      fuelConsumptionPerLap = Number((fuelUsed / lapsCompleted).toFixed(2));
+      fuelConsumptionPerLap = Math.round((fuelUsed / lapsCompleted) * 100) / 100;
     }
 
     let fuelDeltaLaps = 0;
     if (inputs.totalLaps > 0 && inputs.fuelRemainingLaps > 0) {
       const lapsRemainingInRace = Math.max(0, inputs.totalLaps - inputs.currentLap);
-      fuelDeltaLaps = Number((inputs.fuelRemainingLaps - lapsRemainingInRace).toFixed(1));
+      fuelDeltaLaps = Math.round((inputs.fuelRemainingLaps - lapsRemainingInRace) * 10) / 10;
     }
 
     // 5. Pneus: Taxa de Desgaste e Voltas Restantes
     const safeAge = Math.max(1, inputs.tyresAgeLaps);
     const tyreWearRatePerLap: FourWheelsTuple<number> = [
-      Number((inputs.tyresWear[0] / safeAge).toFixed(2)),
-      Number((inputs.tyresWear[1] / safeAge).toFixed(2)),
-      Number((inputs.tyresWear[2] / safeAge).toFixed(2)),
-      Number((inputs.tyresWear[3] / safeAge).toFixed(2))
+      Math.round((inputs.tyresWear[0] / safeAge) * 100) / 100,
+      Math.round((inputs.tyresWear[1] / safeAge) * 100) / 100,
+      Math.round((inputs.tyresWear[2] / safeAge) * 100) / 100,
+      Math.round((inputs.tyresWear[3] / safeAge) * 100) / 100
     ];
 
     const maxWear = Math.max(...inputs.tyresWear);

@@ -12,10 +12,9 @@ Responda APENAS com o texto da fala no rádio, sem aspas, sem asteriscos e sem e
 `;
 
 const TTS_MODELS = [
+  'gemini-3.8-flash-tts',
   'gemini-3.8-flash-lite-tts',
-  'gemini-3.1-flash-tts-preview',
-  'gemini-2.5-flash-preview-tts',
-  'gemini-3.8-flash-tts'
+  'gemini-2.5-flash-preview-tts'
 ];
 
 export interface RadioTransmissionResult {
