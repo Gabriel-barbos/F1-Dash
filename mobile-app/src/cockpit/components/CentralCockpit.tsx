@@ -74,8 +74,9 @@ export const CentralCockpit: React.FC<CentralCockpitProps> = memo(({
   trackTemperature,
   theme,
 }) => {
-  // Formatação do RPM com separador elegante (ex: 11 450)
-  const rpmFormatted = Math.round(rpm || 0)
+  // Formatação do RPM suavizada para as dezenas mais próximas (evita flicker frenético nos dígitos)
+  const rpmRounded = Math.round((rpm || 0) / 10) * 10;
+  const rpmFormatted = rpmRounded
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 

@@ -34,11 +34,16 @@ export interface RadioCallbacks {
 
 export class ClaudinhoMobileService {
   private isTransmitting = false;
+  private rateLimitUntil = 0;
 
   /**
    * Gera texto dinâmico espontâneo com o Gemini 3.8 Flash.
    */
   private async fetchText(eventScenario: string, driverName: string): Promise<string | null> {
+    if (Date.now() < this.rateLimitUntil) {
+      return null; // Quota em cooldown: usa fallback local instantâneo sem travar o Wi-Fi
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2800);
     try {
@@ -63,6 +68,9 @@ export class ClaudinhoMobileService {
         }
       );
       if (!res.ok) {
+        if (res.status === 429) {
+          this.rateLimitUntil = Date.now() + 60000; // 60s de cooldown para evitar retenção de rede
+        }
         console.warn('[ClaudinhoMobile] Texto Gemini 3.8 status:', res.status);
         return null;
       }
@@ -128,17 +136,42 @@ export class ClaudinhoMobileService {
     eventScenario: string,
     text: string,
     wavBase64?: string,
-    callbacks: RadioCallbacks = {}
+    optionsOrCallbacks?: {
+      envelope?: number[];
+      durationMs?: number;
+      dspApplied?: boolean;
+    } | RadioCallbacks,
+    maybeCallbacks?: RadioCallbacks
   ): Promise<void> {
     if (this.isTransmitting) return;
     this.isTransmitting = true;
+
+    const isOptionObj =
+      optionsOrCallbacks &&
+      !('onStart' in optionsOrCallbacks || 'onVoiceStart' in optionsOrCallbacks || 'onEnd' in optionsOrCallbacks);
+
+    const options = isOptionObj
+      ? (optionsOrCallbacks as { envelope?: number[]; durationMs?: number; dspApplied?: boolean })
+      : undefined;
+
+    const callbacks: RadioCallbacks = (isOptionObj
+      ? maybeCallbacks
+      : (optionsOrCallbacks as RadioCallbacks)) || {};
 
     try {
       if (wavBase64) {
         // Áudio dinâmico recebido: só abre o rádio no visor com o áudio pronto
         callbacks.onStart?.(text);
         await mobileAudioPlayer.playRadioBeep();
-        await mobileAudioPlayer.playVoice(wavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+        await mobileAudioPlayer.playVoice(
+          wavBase64,
+          { onPlaybackStart: callbacks.onVoiceStart },
+          {
+            envelope: options?.envelope,
+            durationMs: options?.durationMs,
+            dspAlreadyApplied: options?.dspApplied
+          }
+        );
       } else {
         // Se não tiver WAV, usa o clipe de áudio autêntico em memória (sem robô)
         const clip = getClaudinhoClip(eventScenario, 'Gabriel');

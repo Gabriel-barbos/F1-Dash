@@ -106,7 +106,14 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     });
   };
 
-  const handleTriggerClaudinhoDirect = (scenario: string, text: string, wavBase64?: string) => {
+  const handleTriggerClaudinhoDirect = (
+    scenario: string,
+    text: string,
+    wavBase64?: string,
+    envelope?: number[],
+    dspApplied?: boolean,
+    durationMs?: number
+  ) => {
     if (isRadioTransmittingRef.current) return;
     isRadioTransmittingRef.current = true;
 
@@ -114,6 +121,11 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       scenario,
       text,
       wavBase64,
+      {
+        envelope,
+        dspApplied,
+        durationMs
+      },
       {
         onStart: () => {
           setIsRadioTransmitting(true);
@@ -181,7 +193,14 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
     const unsubMomentary = telemetryService.subscribeMomentaryEvent((event, payload) => {
       if (event === 'TEAM_RADIO') {
         if (payload?.wavBase64) {
-          handleTriggerClaudinhoDirect(payload.scenario || 'OVERTAKE', payload.text || '', payload.wavBase64);
+          handleTriggerClaudinhoDirect(
+            payload.scenario || 'OVERTAKE',
+            payload.text || '',
+            payload.wavBase64,
+            payload.envelope,
+            payload.dspApplied,
+            payload.durationMs
+          );
         } else {
           triggerRadioRef.current(payload?.scenario);
         }
@@ -264,7 +283,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                   styles.pillBtn,
                   {
                     borderColor: !telemetry.connected
-                      ? '#991b1b'
+                      ? telemetryService.isWsConnected()
+                        ? '#b45309'
+                        : '#991b1b'
                       : (telemetry.packetsPerSecond ?? 0) > 0
                       ? '#15803d'
                       : '#b45309'
@@ -277,7 +298,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                     styles.statusDot,
                     {
                       backgroundColor: !telemetry.connected
-                        ? '#ef4444'
+                        ? telemetryService.isWsConnected()
+                          ? '#f59e0b'
+                          : '#ef4444'
                         : (telemetry.packetsPerSecond ?? 0) > 0
                         ? '#22c55e'
                         : '#f59e0b'
@@ -286,7 +309,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                 />
                 <Text style={styles.pillBtnText}>
                   {!telemetry.connected
-                    ? 'RECONECTAR'
+                    ? telemetryService.isWsConnected()
+                      ? 'AGUARDANDO F1'
+                      : 'RECONECTAR'
                     : (telemetry.packetsPerSecond ?? 0) > 0
                     ? `ONLINE • ${telemetry.packetsPerSecond} HZ`
                     : 'AGUARDANDO'}

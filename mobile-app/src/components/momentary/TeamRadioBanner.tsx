@@ -10,8 +10,8 @@ const ENGINEER_PHOTO = require('../../../assets/engineer/claudinho-cutout.png');
 
 const TERRACOTTA = '#E05A36';
 const TERRACOTTA_DEEP = '#B84A28';
-const BAR_COUNT = 36;
-const BAR_STEP_MS = 40;
+const BAR_COUNT = 24;
+const BAR_STEP_MS = 60;
 
 export interface TeamRadioBannerProps {
   /** true enquanto o rádio está aberto (do bipe até o fim da fala). */

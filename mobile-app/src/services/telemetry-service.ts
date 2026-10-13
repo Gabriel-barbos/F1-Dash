@@ -63,22 +63,26 @@ class TelemetryService {
   private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
   private lastUiUpdate: number = 0;
+  private lastDetectorEval: number = 0;
 
   constructor() {
     const store = TelemetryStore.getInstance();
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
         const now = Date.now();
-        // Notificação da UI em tempo real a 60 FPS (a cada 16ms) com thread JS otimizada
-        if (now - this.lastUiUpdate >= 16) {
+        // Notificação da UI suave a 30 FPS (a cada 33ms) para manter o thread JS do Hermes desimpedido
+        if (now - this.lastUiUpdate >= 33) {
           this.lastUiUpdate = now;
           const cockpitState = toCockpitTelemetryState(raceState);
           this.currentState = cockpitState;
 
-          // Avalia eventos de corrida do Claudinho Ronaldo de forma cadenciada sem sobrecarregar o Hermes
-          raceEngineerDetector.evaluate(cockpitState, (scenario) => {
-            this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
-          });
+          // Avalia eventos do engenheiro de forma cadenciada (a cada 250ms) sem travar a fila de rede
+          if (now - this.lastDetectorEval >= 250) {
+            this.lastDetectorEval = now;
+            raceEngineerDetector.evaluate(cockpitState, (scenario) => {
+              this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
+            });
+          }
 
           this.notify();
         }
@@ -156,6 +160,12 @@ class TelemetryService {
     }
   }
 
+  private isWsLinkOpen: boolean = false;
+
+  public isWsConnected(): boolean {
+    return this.mode === 'WEBSOCKET' && this.isWsLinkOpen;
+  }
+
   public connectWs() {
     this.disconnectWs();
 
@@ -164,6 +174,7 @@ class TelemetryService {
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
+        this.isWsLinkOpen = true;
         this.currentState.connected = true;
         this.notify();
       };
@@ -175,12 +186,14 @@ class TelemetryService {
             this.triggerMomentaryEvent('TEAM_RADIO', data);
             return;
           }
+          this.isWsLinkOpen = true;
           this.currentState = { ...this.currentState, ...data };
           this.notify();
         } catch {}
       };
 
       this.ws.onclose = () => {
+        this.isWsLinkOpen = false;
         this.currentState.connected = false;
         this.notify();
         setTimeout(() => {
@@ -191,15 +204,18 @@ class TelemetryService {
       };
 
       this.ws.onerror = () => {
+        this.isWsLinkOpen = false;
         this.ws?.close();
       };
     } catch {
+      this.isWsLinkOpen = false;
       this.currentState.connected = false;
       this.notify();
     }
   }
 
   public disconnectWs() {
+    this.isWsLinkOpen = false;
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.onerror = null;

@@ -64,6 +64,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
   };
 
   const isConnected = telemetry.connected;
+  const isWsRelayPending = connMode === 'WEBSOCKET' && telemetryService.isWsConnected() && !isConnected;
 
   return (
     <View
@@ -92,17 +93,21 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
         </View>
 
         {/* Status de Conexão */}
-        <View style={[styles.statusPill, isConnected ? styles.statusPillOnline : styles.statusPillOffline]}>
+        <View style={[styles.statusPill, isConnected ? styles.statusPillOnline : isWsRelayPending ? styles.statusPillWarning : styles.statusPillOffline]}>
           {isConnected ? (
             <CheckCircle2 size={15} color="#22c55e" strokeWidth={2.5} />
+          ) : isWsRelayPending ? (
+            <RefreshCw size={14} color="#f59e0b" strokeWidth={2.5} />
           ) : (
             <XCircle size={15} color="#ef4444" strokeWidth={2.5} />
           )}
-          <Text style={[styles.statusPillText, { color: isConnected ? '#22c55e' : '#f87171' }]}>
+          <Text style={[styles.statusPillText, { color: isConnected ? '#22c55e' : isWsRelayPending ? '#f59e0b' : '#f87171' }]}>
             {isConnected
               ? connMode === 'MOCK'
                 ? 'SIMULADOR ATIVO (60 FPS)'
                 : `ONLINE • ${telemetry.packetsPerSecond || 60} HZ`
+              : isWsRelayPending
+              ? 'PC CONECTADO • AGUARDANDO F1'
               : 'DESCONECTADO'}
           </Text>
         </View>
@@ -326,6 +331,10 @@ const styles = StyleSheet.create({
   statusPillOnline: {
     backgroundColor: 'rgba(34, 197, 94, 0.12)',
     borderColor: '#22c55e'
+  },
+  statusPillWarning: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: '#f59e0b'
   },
   statusPillOffline: {
     backgroundColor: 'rgba(239, 68, 68, 0.12)',

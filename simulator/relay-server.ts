@@ -10,6 +10,7 @@ import {
   SafetyCarStatus
 } from '@f1-dash/telemetry-core';
 import { RaceEngineerDetector } from '../mobile-app/src/services/race-engineer-detector';
+import { processRadioVoice } from '../mobile-app/src/services/radio-dsp';
 
 // ==========================================
 // CONFIGURAÇÕES DE REDE E PORTAS
@@ -39,18 +40,41 @@ const detector = new RaceEngineerDetector();
 // ==========================================
 const udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 let udpPacketCount = 0;
+let carTelemetryCount = 0;
 let lastUdpPacketTime = 0;
 let currentUdpHz = 0;
+let currentGameHz = 0;
 let lastHzCheck = Date.now();
 let lastDetectorEval = 0;
+let lastSender = 'Nenhum';
+let maxPacketGapMs = 0;
+let lastMessageTimestamp = 0;
+const packetTypesCount: Record<number, number> = {};
 
 udpSocket.on('error', (err) => {
   console.error('[UDP Error]', err);
 });
 
 udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
+  const now = Date.now();
   udpPacketCount++;
-  lastUdpPacketTime = Date.now();
+  lastUdpPacketTime = now;
+  lastSender = `${rinfo.address}:${rinfo.port}`;
+
+  if (lastMessageTimestamp > 0) {
+    const gap = now - lastMessageTimestamp;
+    if (gap > maxPacketGapMs) maxPacketGapMs = gap;
+  }
+  lastMessageTimestamp = now;
+
+  const pId = msg.length >= 7 ? msg.readUInt8(6) : -1;
+  if (pId >= 0) {
+    packetTypesCount[pId] = (packetTypesCount[pId] || 0) + 1;
+    if (pId === 6) {
+      // Packet 6 = CarTelemetry: enviado exatamente 1x por frame pelo F1
+      carTelemetryCount++;
+    }
+  }
 
   try {
     const uint8 = new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength);
@@ -58,9 +82,8 @@ udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
     if (parsed) {
       store.processPacket(parsed);
 
-      // Avalia eventos de corrida do detector de forma cadenciada (a cada 100ms)
-      const now = Date.now();
-      if (now - lastDetectorEval >= 100) {
+      // Avalia eventos de corrida do detector de forma cadenciada (a cada 200ms)
+      if (now - lastDetectorEval >= 200) {
         lastDetectorEval = now;
         const cockpit = store.getCockpitState();
         detector.evaluate(cockpit, (scenario) => {
@@ -168,8 +191,19 @@ async function handleTriggerRadio(scenario: string, telemetry: any) {
 
   const wavBase64 = await generateGeminiSpeech(scenario, radioText);
 
+  let processedWav = wavBase64;
+  let envelope: number[] = [];
+  let durationMs = 3500;
   if (wavBase64) {
-    console.log(`\x1b[32m✔ Áudio gerado (${wavBase64.length} bytes base64) — Enviando aos celulares conectados!\x1b[0m\n`);
+    try {
+      const dsp = processRadioVoice(wavBase64);
+      processedWav = dsp.wavBase64;
+      envelope = dsp.envelope;
+      durationMs = dsp.durationMs;
+      console.log(`\x1b[32m✔ DSP de rádio aplicado no PC em 2ms! (${envelope.length} steps, ${durationMs}ms)\x1b[0m\n`);
+    } catch (e) {
+      console.warn('[PC Relay] Falha ao aplicar DSP:', e);
+    }
   } else {
     console.log(`\x1b[33m⚠ Áudio remoto indisponível — enviando texto com fallback local.\x1b[0m\n`);
   }
@@ -178,7 +212,10 @@ async function handleTriggerRadio(scenario: string, telemetry: any) {
     type: 'TEAM_RADIO',
     scenario,
     text: radioText,
-    wavBase64
+    wavBase64: processedWav,
+    envelope,
+    durationMs,
+    dspApplied: true
   });
 
   for (const client of wss.clients) {
@@ -205,6 +242,9 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         online: Date.now() - lastUdpPacketTime < 2500,
         udpHz: currentUdpHz,
+        maxPacketGapMs,
+        lastSender,
+        packetTypes: packetTypesCount,
         wsClients: wss.clients.size,
         speed: cockpit.speed,
         gear: cockpit.gear,
@@ -322,7 +362,7 @@ setInterval(() => {
   const payload = JSON.stringify({
     ...cockpit,
     connected: isOnline,
-    packetsPerSecond: isOnline ? (currentUdpHz || 30) : 0
+    packetsPerSecond: isOnline ? (currentGameHz || 30) : 0
   });
 
   for (const client of wss.clients) {
@@ -337,7 +377,9 @@ setInterval(() => {
   const now = Date.now();
   const elapsed = (now - lastHzCheck) / 1000;
   if (elapsed >= 1) {
+    currentGameHz = Math.round(carTelemetryCount / elapsed);
     currentUdpHz = Math.round(udpPacketCount / elapsed);
+    carTelemetryCount = 0;
     udpPacketCount = 0;
     lastHzCheck = now;
   }
@@ -346,9 +388,10 @@ setInterval(() => {
   if (Date.now() - lastUdpPacketTime < 2500) {
     const cockpit = store.getCockpitState();
     const gearStr = cockpit.gear === 0 ? 'N' : cockpit.gear === -1 ? 'R' : String(cockpit.gear);
-    process.stdout.write(
-      `\r🏎️ [UDP LIVE: \x1b[32m${currentUdpHz} HZ\x1b[0m] Vel: \x1b[36m${cockpit.speed || 0} km/h\x1b[0m | Marcha: \x1b[33m${gearStr}\x1b[0m | RPM: \x1b[32m${cockpit.engineRPM || 0}\x1b[0m | Dano Asa: \x1b[31m${cockpit.frontLeftWingDamage || 0}%\x1b[0m | Celulares: \x1b[35m${wss.clients.size}\x1b[0m  `
+    console.log(
+      `🏎️ [F1 JOGO: \x1b[32m${currentGameHz} HZ\x1b[0m (${currentUdpHz} pkts/s) | Jitter Max: \x1b[33m${maxPacketGapMs}ms\x1b[0m | De: \x1b[36m${lastSender}\x1b[0m] Vel: ${cockpit.speed || 0} km/h | Marcha: ${gearStr} | Volta: ${cockpit.currentLapNum} | Posição: P${cockpit.carPosition} | Celulares: ${wss.clients.size}`
     );
+    maxPacketGapMs = 0;
   }
 }, 1000);
 

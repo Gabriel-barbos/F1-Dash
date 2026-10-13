@@ -128,7 +128,15 @@ export class MobileAudioPlayer {
    * Aplica o efeito de rádio (DSP em TS puro) no WAV do Gemini TTS e toca.
    * Nunca cai em voz robótica: sem WAV, apenas não fala.
    */
-  public async playVoice(wavBase64?: string, callbacks: VoicePlaybackCallbacks = {}): Promise<void> {
+  public async playVoice(
+    wavBase64?: string,
+    callbacks: VoicePlaybackCallbacks = {},
+    options?: {
+      envelope?: number[];
+      durationMs?: number;
+      dspAlreadyApplied?: boolean;
+    }
+  ): Promise<void> {
     this.stopVoice();
     if (!wavBase64 || !expoAudioModule?.createAudioPlayer) {
       console.warn('[MobileAudioPlayer] Sem áudio da IA para tocar.');
@@ -139,17 +147,27 @@ export class MobileAudioPlayer {
       await this.ensureAudioMode();
 
       let processed: RadioVoiceResult;
-      const t0 = Date.now();
-      try {
-        processed = processRadioVoice(wavBase64);
-        console.log(
-          `[MobileAudioPlayer] 🎛️ DSP de rádio aplicado em ${Date.now() - t0}ms ` +
-            `(RMS ${processed.stats.rmsBefore.toFixed(3)} → ${processed.stats.rmsAfter.toFixed(3)}, ` +
-            `pico ${processed.stats.peakAfter.toFixed(2)}, ${processed.durationMs}ms)`
-        );
-      } catch (dspErr) {
-        console.error('[MobileAudioPlayer] ❌ DSP de rádio FALHOU (tocando áudio original):', dspErr);
-        processed = { wavBase64, envelope: [], durationMs: 3500, stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 } };
+      if (options?.dspAlreadyApplied) {
+        processed = {
+          wavBase64,
+          envelope: options.envelope || [],
+          durationMs: options.durationMs || (options.envelope?.length ? options.envelope.length * 40 : 3500),
+          stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 }
+        };
+        console.log(`[MobileAudioPlayer] 🚀 DSP pré-processado no PC Relay (0ms de carga no Hermes, ${processed.durationMs}ms)`);
+      } else {
+        const t0 = Date.now();
+        try {
+          processed = processRadioVoice(wavBase64);
+          console.log(
+            `[MobileAudioPlayer] 🎛️ DSP de rádio aplicado em ${Date.now() - t0}ms ` +
+              `(RMS ${processed.stats.rmsBefore.toFixed(3)} → ${processed.stats.rmsAfter.toFixed(3)}, ` +
+              `pico ${processed.stats.peakAfter.toFixed(2)}, ${processed.durationMs}ms)`
+          );
+        } catch (dspErr) {
+          console.error('[MobileAudioPlayer] ❌ DSP de rádio FALHOU (tocando áudio original):', dspErr);
+          processed = { wavBase64, envelope: [], durationMs: 3500, stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 } };
+        }
       }
 
       const fileUri = `${FileSystem.cacheDirectory}claudinho_radio_${Date.now()}.wav`;
