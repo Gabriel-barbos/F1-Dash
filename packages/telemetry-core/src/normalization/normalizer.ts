@@ -11,6 +11,7 @@ export class RaceStateNormalizer {
   private eventBus: RaceEventBus;
 
   private packetCount = 0;
+  private frameCount = 0;
   private lastHzCheck = Date.now();
   private prevSafetyCar = SafetyCarStatus.None;
   private prevRedFlag = false;
@@ -33,6 +34,7 @@ export class RaceStateNormalizer {
     this.state = JSON.parse(JSON.stringify(INITIAL_RACE_STATE));
     this.derivedEngine.reset();
     this.packetCount = 0;
+    this.frameCount = 0;
     this.prevSafetyCar = SafetyCarStatus.None;
     this.prevRedFlag = false;
   }
@@ -41,6 +43,9 @@ export class RaceStateNormalizer {
     if (!parsed) return this.state;
 
     this.packetCount++;
+    if (parsed.type === PacketId.CarTelemetry) {
+      this.frameCount++;
+    }
     const now = Date.now();
     this.state.connection.connected = true;
     this.state.connection.lastPacketTime = now;
@@ -229,10 +234,13 @@ export class RaceStateNormalizer {
     this.state.timing.sector3TimeMS = derived.sector3TimeMS;
     this.state.derived = derived;
 
-    // 3. Atualiza medição de frequência de pacotes
+    // 3. Atualiza medição de frequência de quadros do jogo (CarTelemetry)
     const elapsedSec = (now - this.lastHzCheck) / 1000;
     if (elapsedSec >= 1) {
-      this.state.connection.packetsPerSecond = Math.round(this.packetCount / elapsedSec);
+      this.state.connection.packetsPerSecond = Math.round(
+        (this.frameCount > 0 ? this.frameCount : this.packetCount) / elapsedSec
+      );
+      this.frameCount = 0;
       this.packetCount = 0;
       this.lastHzCheck = now;
     }

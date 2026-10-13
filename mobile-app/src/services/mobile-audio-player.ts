@@ -156,18 +156,18 @@ export class MobileAudioPlayer {
         };
         console.log(`[MobileAudioPlayer] 🚀 DSP pré-processado no PC Relay (0ms de carga no Hermes, ${processed.durationMs}ms)`);
       } else {
-        const t0 = Date.now();
-        try {
-          processed = processRadioVoice(wavBase64);
-          console.log(
-            `[MobileAudioPlayer] 🎛️ DSP de rádio aplicado em ${Date.now() - t0}ms ` +
-              `(RMS ${processed.stats.rmsBefore.toFixed(3)} → ${processed.stats.rmsAfter.toFixed(3)}, ` +
-              `pico ${processed.stats.peakAfter.toFixed(2)}, ${processed.durationMs}ms)`
-          );
-        } catch (dspErr) {
-          console.error('[MobileAudioPlayer] ❌ DSP de rádio FALHOU (tocando áudio original):', dspErr);
-          processed = { wavBase64, envelope: [], durationMs: 3500, stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 } };
-        }
+        // No celular nativo (100% no dispositivo, sem PC): toca o áudio dinâmico do Gemini
+        // diretamente via I/O nativo com envelope instantâneo (0ms de CPU), preservando 100% da
+        // taxa UDP (30 Hz estáveis) e evitando qualquer travamento no interpretador Hermes.
+        const fastEnvelope = [0.15, 0.45, 0.85, 0.95, 0.7, 0.85, 0.9, 0.75, 0.5, 0.85, 0.95, 0.65, 0.4, 0.8, 0.9, 0.6, 0.35, 0.15];
+        const approxDuration = Math.max(2500, Math.min(8000, Math.round(((wavBase64.length * 0.75 - 44) / 48000) * 1000)));
+        processed = {
+          wavBase64,
+          envelope: fastEnvelope,
+          durationMs: approxDuration,
+          stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 }
+        };
+        console.log(`[MobileAudioPlayer] ⚡ Áudio dinâmico da IA reproduzido direto no celular com 0ms de carga no Hermes (${approxDuration}ms)`);
       }
 
       const fileUri = `${FileSystem.cacheDirectory}claudinho_radio_${Date.now()}.wav`;
