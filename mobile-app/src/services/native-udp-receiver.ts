@@ -1,11 +1,26 @@
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { ParserRegistry, TelemetryStore } from '@f1-dash/telemetry-core';
 
+/**
+ * Detecta se algum módulo nativo de UDP está compilado no ambiente atual.
+ * No Expo Go (sandbox da loja), os módulos nativos não existem e o require dispara erro capturado no try/catch.
+ * No APK compilado para Android, @isvend/expo-udp ou react-native-udp carrega com sucesso.
+ */
+export const isNativeUdpSupported = (): boolean => {
+  try {
+    // @ts-ignore
+    const expoUdp = require('@isvend/expo-udp');
+    if (expoUdp && typeof expoUdp.createSocket === 'function') return true;
+  } catch {}
+  try {
+    // @ts-ignore
+    const dgram = require('react-native-udp');
+    if (dgram && typeof dgram.createSocket === 'function') return true;
+  } catch {}
+  return false;
+};
+
 export const isRunningInExpoGo = (): boolean => {
-  return (
-    Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
-    Constants.appOwnership === 'expo'
-  );
+  return !isNativeUdpSupported();
 };
 
 // Packet IDs que o Cockpit Display efetivamente exibe na tela.
@@ -38,6 +53,7 @@ export class NativeUdpReceiver {
   private port: number;
   private isListening: boolean = false;
   private store: TelemetryStore;
+  private hasReceivedFirstPacket: boolean = false;
 
   constructor(port: number = 20777) {
     this.port = port;
@@ -46,13 +62,6 @@ export class NativeUdpReceiver {
 
   public async start(): Promise<boolean> {
     if (this.isListening) return true;
-
-    // Se estiver rodando no Expo Go, módulos C++/Java nativos de terceiros não estão
-    // compilados no sandbox da Play Store. Evitamos chamar o require para não disparar erro nativo.
-    if (isRunningInExpoGo()) {
-      console.log('[Native UDP] Expo Go detectado: sockets UDP nativos requerem APK compilado.');
-      return false;
-    }
 
     // 1. Tenta usar @isvend/expo-udp (Módulo nativo oficial do ecossistema Expo no APK)
     try {

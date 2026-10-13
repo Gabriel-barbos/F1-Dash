@@ -11,7 +11,7 @@ import {
   PitStatus
 } from '@f1-dash/telemetry-core';
 import Constants from 'expo-constants';
-import { nativeUdpReceiver, isRunningInExpoGo } from './native-udp-receiver';
+import { nativeUdpReceiver, isRunningInExpoGo, isNativeUdpSupported } from './native-udp-receiver';
 import { raceEngineerDetector } from './race-engineer-detector';
 
 export type TelemetryCallback = (state: CockpitTelemetryState) => void;
@@ -59,7 +59,7 @@ class TelemetryService {
   private currentState: CockpitTelemetryState = { ...INITIAL_COCKPIT_TELEMETRY_STATE };
   private mockInterval: any = null;
   private serverHost: string = getInitialServerHost();
-  private mode: ConnectionMode = isRunningInExpoGo() ? 'MOCK' : 'UDP_NATIVE';
+  private mode: ConnectionMode = isNativeUdpSupported() ? 'UDP_NATIVE' : 'MOCK';
   private deviceName: string = 'PS5 do Goat';
   private storeUnsub: (() => void) | null = null;
   private lastUiUpdate: number = 0;
@@ -92,14 +92,12 @@ class TelemetryService {
       }
     });
 
-    if (isRunningInExpoGo()) {
-      // No Expo Go, o simulador (MOCK) inicia por padrão para testes sem erro de módulo nativo
-      this.mode = 'MOCK';
-      this.startInternalMock();
-    } else {
+    if (this.mode === 'UDP_NATIVE') {
       // No APK compilado para Android, o UDP nativo escuta a porta 20777 direto no celular
-      this.mode = 'UDP_NATIVE';
       this.startNativeUdp();
+    } else {
+      // Apenas no Expo Go de demonstração sem módulos compilados inicia o mock
+      this.startInternalMock();
     }
   }
 
@@ -494,16 +492,18 @@ class TelemetryService {
   }
 
   public triggerMomentaryEvent(type: MomentaryEventType, payload?: any) {
-    if (type === 'SAFETY_CAR') {
-      this.forceStateScenario('SAFETY_CAR');
-    } else if (type === 'VSC') {
-      this.forceStateScenario('VSC');
-    } else if (type === 'RED_FLAG') {
-      this.forceStateScenario('RED_FLAG');
-    } else if (type === 'PIT_LANE') {
-      this.forceStateScenario('PIT_LANE');
-    } else if (type === 'CAR_DAMAGE') {
-      this.forceStateScenario('DAMAGE');
+    if (this.mode === 'MOCK') {
+      if (type === 'SAFETY_CAR') {
+        this.forceStateScenario('SAFETY_CAR');
+      } else if (type === 'VSC') {
+        this.forceStateScenario('VSC');
+      } else if (type === 'RED_FLAG') {
+        this.forceStateScenario('RED_FLAG');
+      } else if (type === 'PIT_LANE') {
+        this.forceStateScenario('PIT_LANE');
+      } else if (type === 'CAR_DAMAGE') {
+        this.forceStateScenario('DAMAGE');
+      }
     }
 
     for (const listener of this.momentaryListeners) {

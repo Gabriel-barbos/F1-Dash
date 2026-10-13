@@ -209,6 +209,10 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
       }
     });
 
+    if (connMode === 'UDP_NATIVE') {
+      telemetryService.startNativeUdp();
+    }
+
     return () => {
       unsubscribe();
       unsubMomentary();
@@ -216,6 +220,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   }, [connMode]);
 
   const handleSelectScenario = (scenario: MockScenario) => {
+    if (connMode !== 'MOCK') return;
     setCurrentScenario(scenario);
     setActiveMomentaryOverlay(null);
     telemetryService.forceStateScenario(scenario);
@@ -237,8 +242,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
 
   const handleDismissOverlay = () => {
     setActiveMomentaryOverlay(null);
-    // Ao fechar tela momentânea, retorna o estado do simulador para a corrida normal
-    telemetryService.forceStateScenario('NORMAL');
+    if (connMode === 'MOCK') {
+      telemetryService.forceStateScenario('NORMAL');
+    }
   };
 
   const hasCriticalDamage =
@@ -283,7 +289,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                   styles.pillBtn,
                   {
                     borderColor: !telemetry.connected
-                      ? telemetryService.isWsConnected()
+                      ? connMode === 'UDP_NATIVE'
+                        ? '#b45309'
+                        : telemetryService.isWsConnected()
                         ? '#b45309'
                         : '#991b1b'
                       : (telemetry.packetsPerSecond ?? 0) > 0
@@ -298,7 +306,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                     styles.statusDot,
                     {
                       backgroundColor: !telemetry.connected
-                        ? telemetryService.isWsConnected()
+                        ? connMode === 'UDP_NATIVE'
+                          ? '#f59e0b'
+                          : telemetryService.isWsConnected()
                           ? '#f59e0b'
                           : '#ef4444'
                         : (telemetry.packetsPerSecond ?? 0) > 0
@@ -309,7 +319,9 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
                 />
                 <Text style={styles.pillBtnText}>
                   {!telemetry.connected
-                    ? telemetryService.isWsConnected()
+                    ? connMode === 'UDP_NATIVE'
+                      ? 'AGUARDANDO F1 (PORTA 20777)'
+                      : telemetryService.isWsConnected()
                       ? 'AGUARDANDO F1'
                       : 'RECONECTAR'
                     : (telemetry.packetsPerSecond ?? 0) > 0

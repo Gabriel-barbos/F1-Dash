@@ -203,8 +203,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
           <TouchableOpacity
             style={[
               styles.modeCard,
-              connMode === 'UDP_NATIVE' && styles.modeCardSelected,
-              isExpo && styles.modeCardDisabled
+              connMode === 'UDP_NATIVE' && styles.modeCardSelected
             ]}
             onPress={() => handleSelectMode('UDP_NATIVE')}
             activeOpacity={0.8}
@@ -216,16 +215,12 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
               <View style={styles.cardTitleWrap}>
                 <View style={styles.badgeRow}>
                   <Text style={styles.cardTitle}>PS5 UDP DIRETO (PORTA 20777)</Text>
-                  {isExpo && (
-                    <View style={styles.warningPill}>
-                      <Text style={styles.warningText}>REQUER APK STANDALONE</Text>
-                    </View>
-                  )}
+                  <View style={styles.recommendedPill}>
+                    <Text style={styles.recommendedText}>100% CELULAR</Text>
+                  </View>
                 </View>
                 <Text style={styles.cardSubtitle}>
-                  {isExpo
-                    ? 'Sockets UDP nativos não abrem no sandbox Expo Go. No Expo Go use "PC RELAY".'
-                    : 'Recepção direta dos pacotes do PS5 na porta 20777 sem computador.'}
+                  Recepção direta dos pacotes UDP do PS5 na porta 20777 direto no celular sem computador.
                 </Text>
               </View>
             </View>
@@ -234,15 +229,15 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
 
         {/* Instruções Rápidas de Configuração */}
         <View style={styles.instructionsBox}>
-          <Text style={styles.instructionTitle}>💡 COMO USAR COM O PC:</Text>
+          <Text style={styles.instructionTitle}>💡 COMO USAR COM O PS5 (100% NO CELULAR):</Text>
           <Text style={styles.instructionText}>
-            1. No terminal do PC, rode <Text style={styles.codeText}>npm run dev</Text> para ligar o servidor.
+            1. No F1 do PS5: Telemetria UDP = <Text style={styles.codeText}>Sim</Text>, Modo de transmissão = <Text style={styles.codeText}>Não</Text>.
           </Text>
           <Text style={styles.instructionText}>
-            2. Toque no botão <Text style={styles.codeText}>CONECTAR</Text> acima com o IP do seu PC.
+            2. IP da telemetria no jogo: Digite o IP deste celular (<Text style={styles.codeText}>{deviceIp}</Text>) na porta <Text style={styles.codeText}>20777</Text>.
           </Text>
           <Text style={styles.instructionText}>
-            3. No F1 do PS5, aponte a telemetria para o IP do seu PC (<Text style={styles.codeText}>{hostInput.split(':')[0]}</Text>) porta <Text style={styles.codeText}>20777</Text>, ou rode <Text style={styles.codeText}>npm run mock</Text> no PC.
+            3. Taxa de envio: <Text style={styles.codeText}>30 Hz</Text> ou <Text style={styles.codeText}>60 Hz</Text>. Toque no botão verde abaixo e acelere!
           </Text>
         </View>
       </ScrollView>
@@ -252,7 +247,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
         <TouchableOpacity
           style={styles.launchButton}
           onPress={() => {
-            telemetryService.forceStateScenario('NORMAL');
+            if (connMode === 'MOCK') {
+              telemetryService.forceStateScenario('NORMAL');
+            }
             onLaunchCockpit();
           }}
           activeOpacity={0.85}
