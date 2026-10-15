@@ -79,9 +79,13 @@ class TelemetryService {
           // Avalia eventos do engenheiro de forma cadenciada (a cada 250ms) sem travar a fila de rede
           if (now - this.lastDetectorEval >= 250) {
             this.lastDetectorEval = now;
-            raceEngineerDetector.evaluate(cockpitState, (scenario) => {
-              this.triggerMomentaryEvent('TEAM_RADIO', { scenario, state: cockpitState });
-            });
+            try {
+              raceEngineerDetector.evaluate(cockpitState, (scenario) => {
+                this.triggerMomentaryEvent('TEAM_RADIO', { scenario, state: cockpitState });
+              });
+            } catch (err) {
+              console.warn('[TelemetryService] Falha no detector do engenheiro:', err);
+            }
           }
 
           this.notify();

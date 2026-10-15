@@ -71,8 +71,24 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const prevSafetyCar = useRef<SafetyCarStatus>(SafetyCarStatus.None);
   const prevRedFlag = useRef<boolean>(false);
 
+  const pendingRadioRef = useRef<{ scenario: string; state?: CockpitTelemetryState; at: number } | null>(null);
+
+  const flushPendingRadio = () => {
+    const pending = pendingRadioRef.current;
+    pendingRadioRef.current = null;
+    if (pending && Date.now() - pending.at <= 10000) {
+      setTimeout(() => triggerRadioRef.current(pending.scenario, pending.state), 400);
+    }
+  };
+
   const handleTriggerClaudinhoRadio = (scenarioOverride?: string, telemetryOverride?: CockpitTelemetryState) => {
-    if (isRadioTransmittingRef.current) return;
+    if (isRadioTransmittingRef.current) {
+      // Rádio ocupado: guarda o evento mais recente para tocar logo após a transmissão atual
+      if (typeof scenarioOverride === 'string') {
+        pendingRadioRef.current = { scenario: scenarioOverride, state: telemetryOverride, at: Date.now() };
+      }
+      return;
+    }
     isRadioTransmittingRef.current = true;
 
     const validScenario = typeof scenarioOverride === 'string' ? scenarioOverride : undefined;
@@ -98,6 +114,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
             setIsRadioTransmitting(false);
             setRadioVoice(null);
             setRadioPhase('connecting');
+            flushPendingRadio();
           }, 350);
         }
       },

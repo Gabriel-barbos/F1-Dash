@@ -7,7 +7,8 @@
     "dev": "node ./node_modules/expo/bin/cli start",
     "android": "node ./node_modules/expo/bin/cli run:android",
     "ios": "node ./node_modules/expo/bin/cli run:ios",
-    "web": "node ./node_modules/expo/bin/cli start --web"
+    "web": "node ./node_modules/expo/bin/cli start --web",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@expo-google-fonts/orbitron": "^0.4.2",

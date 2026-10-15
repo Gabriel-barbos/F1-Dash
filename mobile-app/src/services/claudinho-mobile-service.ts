@@ -25,6 +25,9 @@ const TTS_MODELS = [
   'gemini-2.5-flash-preview-tts'
 ];
 
+/** Tempo máximo total (texto + voz) antes de cair no clipe local, para o rádio nunca chegar atrasado. */
+const AI_TOTAL_BUDGET_MS = 6500;
+
 export interface RadioTransmissionResult {
   message: string;
   tone: string;
@@ -75,7 +78,7 @@ export class ClaudinhoMobileService {
     if (tyreTemp !== undefined) parts.push(`Temp pneus: ${tyreTemp}°C`);
     if (brakeTemp !== undefined) parts.push(`Temp freios: ${brakeTemp}°C`);
     if (fuelLaps) parts.push(`Combustível restante: ${fuelLaps}`);
-    if (ers) parts.push(`Bateria ERS: ${ersPct}`);
+    if (ersPct) parts.push(`Bateria ERS: ${ersPct}`);
 
     return `DADOS DA CORRIDA:\n${parts.join('\n')}\n\nInstrução: Dê uma instrução útil e direta ao piloto usando os dados acima. Se for uma situação de corrida normal/calma, informe sobre pneus, combustível, ritmo ou gaps. Seja parceiro e técnico. Palavrão SOMENTE se for batida ou perigo iminente. Nunca use frases clichês como "lata velha".`;
   }
@@ -90,9 +93,9 @@ export class ClaudinhoMobileService {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2800);
-    const userPromptText = this.buildTelemetryPrompt(eventScenario, driverName, telemetry);
 
     try {
+      const userPromptText = this.buildTelemetryPrompt(eventScenario, driverName, telemetry);
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${API_KEY}`,
         {
@@ -134,7 +137,7 @@ export class ClaudinhoMobileService {
   /**
    * Sintetiza voz oficial Puck via Gemini TTS com fallback sequencial entre modelos da cota.
    */
-  private async fetchVoice(text: string): Promise<string | null> {
+  private async fetchVoice(text: string, deadline: number = Date.now() + AI_TOTAL_BUDGET_MS): Promise<string | null> {
     const body = JSON.stringify({
       contents: [{ parts: [{ text }] }],
       generationConfig: {
@@ -144,8 +147,13 @@ export class ClaudinhoMobileService {
     });
 
     for (const model of TTS_MODELS) {
+      const remaining = deadline - Date.now();
+      if (remaining < 800) {
+        console.warn('[ClaudinhoMobile] Orçamento de tempo da IA esgotado, usando clipe local.');
+        return null;
+      }
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      const timer = setTimeout(() => controller.abort(), Math.min(3500, remaining));
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
@@ -262,35 +270,41 @@ export class ClaudinhoMobileService {
     let finalMessage = '';
 
     try {
-      // 1. Tenta obter fala dinâmica inédita e informativa via Gemini Flash
-      let generatedText = await this.fetchText(eventScenario, driverName, telemetry);
+      // 1. CAMINHO DA IA (isolado): qualquer erro aqui cai no fallback local, nunca em silêncio
+      let generatedText: string | null = null;
       let dynamicWavBase64: string | null = null;
-
-      if (generatedText) {
-        // 2. Se obteve texto, tenta sintetizar voz oficial com a esteira multi-modelos
-        dynamicWavBase64 = await this.fetchVoice(generatedText);
+      try {
+        const deadline = Date.now() + AI_TOTAL_BUDGET_MS;
+        generatedText = await this.fetchText(eventScenario, driverName, telemetry);
+        if (generatedText && Date.now() < deadline) {
+          dynamicWavBase64 = await this.fetchVoice(generatedText, deadline);
+        }
+      } catch (aiErr) {
+        console.warn('[ClaudinhoMobile] Caminho IA falhou, usando clipe local:', aiErr);
+        generatedText = null;
+        dynamicWavBase64 = null;
       }
 
-      // 3. SE CONSEGUIU ÁUDIO DINÂMICO VIA IA:
+      let playedDynamic = false;
       if (generatedText && dynamicWavBase64) {
-        finalMessage = generatedText;
-        // Só abre a barra no rádio AGORA que a voz está pronta!
-        callbacks.onStart?.(generatedText);
-        // Toca o bipe oficial
-        await mobileAudioPlayer.playRadioBeep();
-        // Toca a voz gerada com o DSP de capacete aplicado
-        await mobileAudioPlayer.playVoice(dynamicWavBase64, { onPlaybackStart: callbacks.onVoiceStart });
-      } else {
-        // 4. FALLBACK INTELIGENTE (se a API falhar, der 429 ou timeout):
+        try {
+          finalMessage = generatedText;
+          callbacks.onStart?.(generatedText);
+          await mobileAudioPlayer.playRadioBeep();
+          await mobileAudioPlayer.playVoice(dynamicWavBase64, { onPlaybackStart: callbacks.onVoiceStart });
+          playedDynamic = true;
+        } catch (playErr) {
+          console.warn('[ClaudinhoMobile] Falha ao tocar voz dinâmica, usando clipe local:', playErr);
+        }
+      }
+
+      if (!playedDynamic) {
+        // 2. FALLBACK GARANTIDO: clipe autêntico local (Puck) em memória
         console.log(`[ClaudinhoMobile] 🛡️ Ativando áudio autêntico local do Claudinho para ${eventScenario}...`);
         const clip = getClaudinhoClip(eventScenario, driverName);
         finalMessage = clip.text;
-
-        // Só abre a barra no rádio com o clipe pronto em memória!
         callbacks.onStart?.(clip.text);
-        // Toca o bipe oficial
         await mobileAudioPlayer.playRadioBeep();
-        // Toca o áudio autêntico oficial do Puck
         await mobileAudioPlayer.playAsset(
           clip.asset,
           clip.envelope,
