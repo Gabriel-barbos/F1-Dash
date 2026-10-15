@@ -1,12 +1,12 @@
 import { RemoteInfo } from 'node:dgram';
-import { PacketId } from '../models/packet-ids.js';
+import { PacketId, ParsedPacket } from '@f1-dash/telemetry-core';
 
-export interface ReceiverConfig {
+export interface UdpReceiverConfig {
   port: number;
   host: string;
 }
 
-export interface ReceiverStats {
+export interface UdpReceiverStats {
   totalPackets: number;
   totalBytes: number;
   packetsPerSecond: number;

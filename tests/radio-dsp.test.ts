@@ -1,6 +1,6 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processRadioVoice, bytesToBase64, base64ToBytes } from '../mobile-app/src/services/radio-dsp.ts';
+import { processRadioVoice, bytesToBase64, base64ToBytes } from '../mobile-app/src/services/radio-dsp';
 
 const SR = 24000;
 

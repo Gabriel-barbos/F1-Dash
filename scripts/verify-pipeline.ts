@@ -1,4 +1,4 @@
-import { UdpReceiver } from '../src/udp/receiver';
+import { UdpReceiver } from '../src/modules/udp-engine/udp-receiver.js';
 import { TelemetryStore } from '@f1-dash/telemetry-core';
 import { spawn } from 'node:child_process';
 

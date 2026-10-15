@@ -71,12 +71,13 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
   const prevSafetyCar = useRef<SafetyCarStatus>(SafetyCarStatus.None);
   const prevRedFlag = useRef<boolean>(false);
 
-  const handleTriggerClaudinhoRadio = (scenarioOverride?: string) => {
+  const handleTriggerClaudinhoRadio = (scenarioOverride?: string, telemetryOverride?: CockpitTelemetryState) => {
     if (isRadioTransmittingRef.current) return;
     isRadioTransmittingRef.current = true;
 
     const validScenario = typeof scenarioOverride === 'string' ? scenarioOverride : undefined;
     const scenario = validScenario || (currentScenario === 'NORMAL' ? 'OVERTAKE' : currentScenario);
+    const telemetrySnapshot = telemetryOverride || telemetry;
 
     claudinhoMobileService.triggerRadio(
       scenario,
@@ -99,7 +100,8 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
             setRadioPhase('connecting');
           }, 350);
         }
-      }
+      },
+      telemetrySnapshot
     ).catch(() => {
       isRadioTransmittingRef.current = false;
       setIsRadioTransmitting(false);
@@ -202,7 +204,7 @@ export const CockpitScreen: React.FC<CockpitScreenProps> = ({
             payload.durationMs
           );
         } else {
-          triggerRadioRef.current(payload?.scenario);
+          triggerRadioRef.current(payload?.scenario, payload?.state);
         }
       } else {
         setActiveMomentaryOverlay(event);

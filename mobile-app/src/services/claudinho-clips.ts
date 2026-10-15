@@ -248,17 +248,89 @@ export const CLAUDINHO_CLIPS: ClaudinhoClip[] = [
     envelope: [0.131,0.056,0.056,0.056,0.428,0.56,0.102,0.976,0.98,0.394,0.114,0.729,0.249,0.879,0.172,0.118,0.708,0.637,0.294,0.706,0.712,0.873,0.433,0.307,0.105,0.071,0.167,0.063,0.854,0.772,0.563,0.085,0.683,0.259,0.107,0.949,0.459,0.237,0.846,0.631,0.965,0.77,0.389,0.375,0.081,0.063,0.06,0.058,0.252,0.035,0.083,0.003]
   },
   {
-    id: "calm_1",
+    id: "calm_pace",
     scenario: "CALM_RACE",
-    text: "Tá tão calmo que parece passeio de domingo, Gabriel! Anda logo com essa lata velha!",
-    asset: CLAUDINHO_AUDIO_ASSETS["calm_1.wav"],
-    durationMs: 5710,
-    envelope: [0.1,0.043,0.043,0.042,0.809,0.086,0.065,0.19,0.562,0.098,0.056,0.049,0.664,0.703,0.324,0.546,0.284,0.057,0.912,0.427,0.127,0.053,0.488,0.078,0.414,0.194,0.219,0.313,0.254,0.278,0.233,0.244,0.208,0.414,0.881,0.186,0.326,0.589,0.772,0.787,0.223,0.099,0.178,0.116,0.521,0.428,0.901,0.662,0.386,0.911,0.243,0.079,0.68,0.217,0.475,0.348,0.512,0.315,0.108,0.367,0.505,0.305,0.859,0.514,0.08,0.052,0.047,0.045,0.031,0.043,0.113,0.006]
+    text: "Ritmo constante, Gabriel! Abre vantagem pro pelotão e cuida dos pneus.",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_3.wav"],
+    durationMs: 4800,
+    envelope: [0.08,0.04,0.04,0.35,0.72,0.85,0.6,0.3,0.15,0.7,0.85,0.4,0.2,0.65,0.8,0.4,0.1,0.05]
+  },
+  {
+    id: "calm_clean",
+    scenario: "CALM_RACE",
+    text: "Pista limpa na sua frente, Gabriel. Foca no traçado e mantém essa pegada!",
+    asset: CLAUDINHO_AUDIO_ASSETS["fastest_lap_2.wav"],
+    durationMs: 4200,
+    envelope: [0.09,0.05,0.5,0.85,0.9,0.4,0.2,0.7,0.8,0.6,0.2,0.1,0.05]
+  },
+  {
+    id: "tyre_wear_warn_1",
+    scenario: "TYRE_WEAR_WARNING",
+    text: "Pneus dianteiros passando de 50%, Gabriel. Começa a administrar a borracha nas curvas!",
+    asset: CLAUDINHO_AUDIO_ASSETS["tyre_wear_2.wav"],
+    durationMs: 3800,
+    envelope: [0.1,0.05,0.6,0.8,0.7,0.3,0.65,0.9,0.5,0.2,0.1,0.05]
+  },
+  {
+    id: "tyre_temp_1",
+    scenario: "TYRE_TEMP_HIGH",
+    text: "Temperatura dos pneus subindo, Gabriel! Não escorrega tanto na saída de curva!",
+    asset: CLAUDINHO_AUDIO_ASSETS["tyre_wear_1.wav"],
+    durationMs: 4500,
+    envelope: [0.1,0.05,0.4,0.7,0.9,0.5,0.3,0.8,0.6,0.2,0.05]
+  },
+  {
+    id: "brake_temp_1",
+    scenario: "BRAKE_TEMP_HIGH",
+    text: "Temperatura dos freios no limite, Gabriel! Alivia um pouco a pressão na freada!",
+    asset: CLAUDINHO_AUDIO_ASSETS["damage_2.wav"],
+    durationMs: 3710,
+    envelope: [0.096,0.043,0.62,0.337,0.818,0.453,0.721,0.853,0.603,0.395,0.629,0.082,0.05]
+  },
+  {
+    id: "fuel_low_1",
+    scenario: "FUEL_LOW",
+    text: "Combustível no limite negativo, Gabriel! Faz um pouco de lift and coast nessa volta!",
+    asset: CLAUDINHO_AUDIO_ASSETS["pit_lane_2.wav"],
+    durationMs: 4300,
+    envelope: [0.1,0.05,0.5,0.8,0.6,0.3,0.7,0.85,0.4,0.1,0.05]
+  },
+  {
+    id: "fuel_surplus_1",
+    scenario: "FUEL_SURPLUS",
+    text: "Margem de combustível tá boa, Gabriel! Pode acelerar forte e subir o ritmo!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_3.wav"],
+    durationMs: 5110,
+    envelope: [0.092,0.039,0.05,0.5,0.7,0.8,0.6,0.4,0.7,0.9,0.5,0.1,0.05]
+  },
+  {
+    id: "ers_full_1",
+    scenario: "ERS_FULL",
+    text: "Bateria cheia no volante, Gabriel! Aproveita a reta e usa o modo ultrapassagem!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_1.wav"],
+    durationMs: 5270,
+    envelope: [0.092,0.039,0.7,0.8,0.5,0.3,0.9,1,0.6,0.2,0.05]
+  },
+  {
+    id: "ers_low_1",
+    scenario: "ERS_LOW",
+    text: "Bateria no osso agora, Gabriel! Recarrega no miolo pra ter pressão na reta!",
+    asset: CLAUDINHO_AUDIO_ASSETS["pit_lane_1.wav"],
+    durationMs: 4900,
+    envelope: [0.1,0.05,0.6,0.8,0.7,0.4,0.7,0.9,0.4,0.1,0.05]
+  },
+  {
+    id: "lap_pace_1",
+    scenario: "LAP_PACE",
+    text: "Bela volta, Gabriel! Mantém esse ritmo constante que o tempo tá excelente!",
+    asset: CLAUDINHO_AUDIO_ASSETS["fastest_lap_2.wav"],
+    durationMs: 4200,
+    envelope: [0.09,0.05,0.5,0.85,0.9,0.4,0.2,0.7,0.8,0.6,0.2,0.1,0.05]
   },
   {
     id: "start_1",
     scenario: "START",
-    text: "Moleque doido, passou voando! Mantém essa porra de ritmo!",
+    text: "Moleque doido, passou voando! Mantém esse ritmo forte!",
     asset: CLAUDINHO_AUDIO_ASSETS["overtake_2.wav"],
     durationMs: 6110,
     envelope: [0.125,0.053,0.054,0.053,0.207,0.385,0.447,0.438,0.652,0.961,0.929,0.826,0.095,0.129,0.117,0.133,0.063,0.065,0.542,0.819,0.704,0.857,0.984,0.327,0.095,0.344,0.494,0.412,0.068,0.833,0.233,0.159,0.877,0.191,0.18,0.615,0.844,0.979,0.82,0.924,0.593,0.64,0.506,0.083,0.152,0.11,0.075,0.058,0.249,0.233,0.075,0.288,0.214,0.448,0.12,0.671,0.076,0.063,0.648,0.536,0.698,0.148,0.447,0.284,0.278,0.088,0.787,0.178,0.134,0.059,0.055,0.053,0.056,0.04,0.056,0.136,0.007]

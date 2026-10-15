@@ -80,7 +80,7 @@ class TelemetryService {
           if (now - this.lastDetectorEval >= 250) {
             this.lastDetectorEval = now;
             raceEngineerDetector.evaluate(cockpitState, (scenario) => {
-              this.triggerMomentaryEvent('TEAM_RADIO', { scenario });
+              this.triggerMomentaryEvent('TEAM_RADIO', { scenario, state: cockpitState });
             });
           }
 

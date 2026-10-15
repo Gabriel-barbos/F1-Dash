@@ -221,4 +221,85 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
     assert.strictEqual(triggered.length, 3, 'Na volta seguinte a cota de 1-2 acionamentos deve resetar');
     assert.strictEqual(triggered[2], 'OVERTAKE');
   });
+
+  test('deve disparar TYRE_WEAR_WARNING preventivo quando desgaste atingir 45%', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, tyresWear: [20, 20, 15, 15] },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, null);
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, tyresWear: [46, 30, 20, 20] },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'TYRE_WEAR_WARNING');
+  });
+
+  test('deve disparar TYRE_TEMP_HIGH quando pneus superaquecerem (> 105°C)', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, tyresSurfaceTemperature: [95, 95, 90, 90] },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, tyresSurfaceTemperature: [108, 98, 92, 92] },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'TYRE_TEMP_HIGH');
+  });
+
+  test('deve disparar BRAKE_TEMP_HIGH quando freios ultrapassarem 820°C', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, brakesTemperature: [450, 450, 400, 400] },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, brakesTemperature: [835, 780, 420, 410] },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'BRAKE_TEMP_HIGH');
+  });
+
+  test('deve disparar FUEL_LOW quando combustível estiver em déficit (< -0.4)', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 3, fuelRemainingLaps: 0.1 },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 3, fuelRemainingLaps: -0.5 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'FUEL_LOW');
+  });
+
+  test('deve disparar ERS_FULL quando bateria estiver cheia (> 90%) em alta velocidade', () => {
+    const detector = new RaceEngineerDetector();
+    let triggeredScenario: string | null = null;
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 180, ersPercentage: 70 },
+      (sc) => { triggeredScenario = sc; }
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, speed: 235, ersPercentage: 95 },
+      (sc) => { triggeredScenario = sc; }
+    );
+    assert.strictEqual(triggeredScenario, 'ERS_FULL');
+  });
 });

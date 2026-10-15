@@ -1,12 +1,12 @@
 import dgram, { Socket, RemoteInfo } from 'node:dgram';
 import { EventEmitter } from 'node:events';
-import { ReceiverConfig, ReceiverStats } from './types.js';
-import { ParserRegistry, ParsedPacket, PacketId } from '../../packages/telemetry-core/src/index.js';
+import { ParserRegistry, ParsedPacket, PacketId } from '@f1-dash/telemetry-core';
+import { UdpReceiverConfig, UdpReceiverStats } from './types.js';
 
 export class UdpReceiver extends EventEmitter {
   private socket: Socket | null = null;
-  private config: ReceiverConfig;
-  private stats: ReceiverStats = {
+  private config: UdpReceiverConfig;
+  private stats: UdpReceiverStats = {
     totalPackets: 0,
     totalBytes: 0,
     packetsPerSecond: 0,
@@ -20,7 +20,7 @@ export class UdpReceiver extends EventEmitter {
   private bytesInCurrentSecond = 0;
   private statsTimer: NodeJS.Timeout | null = null;
 
-  constructor(config: Partial<ReceiverConfig> = {}) {
+  constructor(config: Partial<UdpReceiverConfig> = {}) {
     super();
     this.config = {
       port: config.port ?? 20777,
@@ -29,7 +29,7 @@ export class UdpReceiver extends EventEmitter {
   }
 
   /**
-   * Inicia a escuta do socket UDP.
+   * Inicia a escuta do socket UDP no Node.js.
    */
   public start(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -85,7 +85,7 @@ export class UdpReceiver extends EventEmitter {
   /**
    * Retorna as estatísticas atuais de tráfego.
    */
-  public getStats(): ReceiverStats {
+  public getStats(): UdpReceiverStats {
     return { ...this.stats };
   }
 
@@ -105,7 +105,9 @@ export class UdpReceiver extends EventEmitter {
     const parsed = ParserRegistry.parse(uint8);
     if (parsed) {
       const type = parsed.type;
-      this.stats.packetCountByType[type] = (this.stats.packetCountByType[type] ?? 0) + 1;
+      if (typeof type === 'number') {
+        this.stats.packetCountByType[type] = (this.stats.packetCountByType[type] ?? 0) + 1;
+      }
       this.emit('packet', parsed, msg, rinfo);
     }
   }

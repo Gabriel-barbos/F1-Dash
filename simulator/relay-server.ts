@@ -131,13 +131,13 @@ const SCENARIO_FALLBACKS: Record<string, string[]> = {
     'Roxo em todos os setores! Você tá voando baixo hoje, porra!'
   ],
   CALM_RACE: [
-    'Tá tão calmo que parece passeio de domingo, Gabriel! Anda logo com essa lata velha!',
-    'Tudo sussa por aqui, Gabriel. Só não vai dormir no volante, caralho!',
-    'Pista limpa na sua frente, hein? Vê se não inventa moda e mantém o ritmo, moleque!'
+    'Pista limpa na sua frente, Gabriel. Mantém esse ritmo e cuida dos pneus.',
+    'Ritmo muito constante, Gabriel. Administra a borracha que o stint tá sob controle.',
+    'Tudo sob controle por enquanto, Gabriel. Foca no traçado e abre distância.'
   ],
   GAP_UPDATE: [
-    'O cara da frente tá logo ali, Gabriel! Tira essa diferença, caralho!',
-    'Cola na asa dele, porra! Tá a menos de dois segundos, bota pressão!'
+    'O cara da frente tá logo ali, Gabriel! Tira essa diferença!',
+    'Cola na asa dele! Tá a menos de dois segundos, bota pressão!'
   ],
   RED_FLAG: [
     'Bandeira vermelha, caralho! Sessão suspensa, traz o carro pro box devagar!'
@@ -146,7 +146,39 @@ const SCENARIO_FALLBACKS: Record<string, string[]> = {
     'Puta que pariu, tomou passada! Foco na retomada, Gabriel, vai pra cima!'
   ],
   TYRE_WEAR: [
-    'Esses pneus tão no osso, porra! Mais de 70% de desgaste, segura na curva!'
+    'Esses pneus tão no osso, porra! Mais de 70% de desgaste, prepara o box!'
+  ],
+  TYRE_WEAR_WARNING: [
+    'Pneus dianteiros passando de 50%, Gabriel. Começa a administrar a borracha.',
+    'Desgaste subindo na frente. Economiza pneu nas curvas rápidas.'
+  ],
+  TYRE_TEMP_HIGH: [
+    'Temperatura dos pneus passando de 105 graus, Gabriel! Não escorrega na tração.',
+    'Pneus superaquecendo, Gabriel. Alivia um pouco o ritmo pra não esfarelar.'
+  ],
+  BRAKE_TEMP_HIGH: [
+    'Temperatura dos freios no limite, Gabriel! Alivia a pressão na freada da 1.',
+    'Freios muito quentes! Joga o balanço um clique pra trás e respira.'
+  ],
+  FUEL_LOW: [
+    'Combustível no negativo, Gabriel! Faz um pouco de lift and coast nessa volta.',
+    'Margem de combustível no limite. Economiza na reta pra não faltar no final.'
+  ],
+  FUEL_SURPLUS: [
+    'Margem de combustível tá positiva, Gabriel! Pode acelerar e subir o ritmo.',
+    'Sobra de combustível no tanque. Bota pressão e ataca o carro da frente!'
+  ],
+  ERS_FULL: [
+    'Bateria cheia no volante, Gabriel! Aproveita a reta e solta o modo ultrapassagem!',
+    'Bateria no talo, Gabriel. Usa o boost na reta principal agora!'
+  ],
+  ERS_LOW: [
+    'Bateria no osso agora, Gabriel. Recarrega no miolo pra ter pressão na reta.',
+    'Energia esgotada por enquanto. Foca na tração limpa pra recuperar.'
+  ],
+  LAP_PACE: [
+    'Excelente volta, Gabriel! Mantém esse ritmo constante que o tempo tá forte.',
+    'Ritmo muito bom nessa volta. Continua virando nesse segundo!'
   ]
 };
 

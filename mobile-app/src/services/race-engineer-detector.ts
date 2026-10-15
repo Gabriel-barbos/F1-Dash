@@ -26,6 +26,8 @@ export class RaceEngineerDetector {
   private prevBestLapTime: number = 0;
   private prevSpeed: number = 0;
   private prevTyreWearThresholdNotified: Set<number> = new Set();
+  private prevFuelLowNotified: boolean = false;
+  private prevFuelSurplusNotified: boolean = false;
 
   private lastGlobalTriggerTime: number = 0;
   private lastTriggerByScenario: Map<string, number> = new Map();
@@ -58,6 +60,8 @@ export class RaceEngineerDetector {
     this.prevBestLapTime = 0;
     this.prevSpeed = 0;
     this.prevTyreWearThresholdNotified.clear();
+    this.prevFuelLowNotified = false;
+    this.prevFuelSurplusNotified = false;
     this.lastGlobalTriggerTime = 0;
     this.lastTriggerByScenario.clear();
     this.triggersInCurrentLap = 0;
@@ -69,7 +73,7 @@ export class RaceEngineerDetector {
    */
   public evaluate(
     state: CockpitTelemetryState,
-    onTrigger: (scenario: string) => void
+    onTrigger: (scenario: string, telemetrySnapshot?: CockpitTelemetryState) => void
   ) {
     if (!state.connected) {
       return;
@@ -139,7 +143,7 @@ export class RaceEngineerDetector {
       this.lastGlobalTriggerTime = now;
       this.lastTriggerByScenario.set(scenario, now);
       this.triggersInCurrentLap++;
-      onTrigger(scenario);
+      onTrigger(scenario, state);
     };
 
     // 1. IMPACTO / BATIDA / NOVO DANO (Alta Prioridade)
@@ -257,7 +261,7 @@ export class RaceEngineerDetector {
       this.prevBestLapTime = bestLapTime;
     }
 
-    // 8. DESGASTE CRÍTICO DE PNEUS (> 70%)
+    // 8. DESGASTE DE PNEUS (Alerta preventivo a 45% e Crítico a 70%)
     if (state.tyresWear && state.tyresWear.length >= 4) {
       const maxWear = Math.max(...state.tyresWear);
       if (maxWear >= 70 && !this.prevTyreWearThresholdNotified.has(70)) {
@@ -265,10 +269,63 @@ export class RaceEngineerDetector {
         if (canSpeakScenario('TYRE_WEAR', 45000)) {
           trigger('TYRE_WEAR', 45000);
         }
+      } else if (maxWear >= 45 && !this.prevTyreWearThresholdNotified.has(45)) {
+        this.prevTyreWearThresholdNotified.add(45);
+        if (canSpeakScenario('TYRE_WEAR_WARNING', 45000)) {
+          trigger('TYRE_WEAR_WARNING', 45000);
+        }
       }
     }
 
-    // 9. TEMPO DE OUTROS PILOTOS / GAP (a cada volta completada com gap relevante para o carro da frente ou de trás)
+    // 8b. TEMPERATURA DOS PNEUS (Superaquecimento de superfície > 105°C)
+    if (state.tyresSurfaceTemperature && state.tyresSurfaceTemperature.length >= 4) {
+      const maxTyreTemp = Math.max(...state.tyresSurfaceTemperature);
+      if (maxTyreTemp >= 106) {
+        if (canSpeakScenario('TYRE_TEMP_HIGH', 50000)) {
+          trigger('TYRE_TEMP_HIGH', 50000);
+        }
+      }
+    }
+
+    // 8c. TEMPERATURA DE FREIOS (> 820°C)
+    if (state.brakesTemperature && state.brakesTemperature.length >= 4) {
+      const maxBrakeTemp = Math.max(...state.brakesTemperature);
+      if (maxBrakeTemp >= 820) {
+        if (canSpeakScenario('BRAKE_TEMP_HIGH', 45000)) {
+          trigger('BRAKE_TEMP_HIGH', 45000);
+        }
+      }
+    }
+
+    // 8d. GERENCIAMENTO DE COMBUSTÍVEL
+    if (curLap >= 3 && state.fuelRemainingLaps !== undefined) {
+      if (state.fuelRemainingLaps <= -0.4 && !this.prevFuelLowNotified) {
+        this.prevFuelLowNotified = true;
+        if (canSpeakScenario('FUEL_LOW', 60000)) {
+          trigger('FUEL_LOW', 60000);
+        }
+      } else if (state.fuelRemainingLaps >= 1.2 && curLap >= 5 && !this.prevFuelSurplusNotified) {
+        this.prevFuelSurplusNotified = true;
+        if (canSpeakScenario('FUEL_SURPLUS', 60000)) {
+          trigger('FUEL_SURPLUS', 60000);
+        }
+      }
+    }
+
+    // 8e. ERS E BATERIA
+    if (state.ersPercentage !== undefined) {
+      if (state.ersPercentage >= 92 && curSpeed > 220) {
+        if (canSpeakScenario('ERS_FULL', 45000)) {
+          trigger('ERS_FULL', 45000);
+        }
+      } else if (state.ersPercentage <= 12 && curLap >= 2 && curSpeed > 100) {
+        if (canSpeakScenario('ERS_LOW', 45000)) {
+          trigger('ERS_LOW', 45000);
+        }
+      }
+    }
+
+    // 9. TEMPO DE OUTROS PILOTOS / GAP / RITMO DE VOLTA
     const gapFrontMS = state.deltaToCarInFrontInMS ?? 0;
     const gapBehindMS = state.deltaToCarBehindInMS ?? 0;
 
@@ -281,14 +338,18 @@ export class RaceEngineerDetector {
         if (canSpeakScenario('GAP_UPDATE', 35000)) {
           trigger('GAP_UPDATE', 35000);
         }
+      } else if (state.lastLapTimeInMS && state.lastLapTimeInMS > 0) {
+        if (canSpeakScenario('LAP_PACE', 45000)) {
+          trigger('LAP_PACE', 45000);
+        }
       }
     }
 
-    // 10. MOMENTO MONÓTONO / CALMARIA / PIADA (ritmo de cruzeiro > 80km/h sem incidentes por 45s)
+    // 10. MOMENTO ESTÁVEL / CALMARIA INFORMATIVA (ritmo de cruzeiro > 80km/h sem incidentes por 50s)
     const speed = state.speed ?? 0;
-    if (speed > 80 && now - this.lastGlobalTriggerTime >= 45000) {
-      if (canSpeakScenario('CALM_RACE', 45000)) {
-        trigger('CALM_RACE', 45000);
+    if (speed > 80 && now - this.lastGlobalTriggerTime >= 50000) {
+      if (canSpeakScenario('CALM_RACE', 50000)) {
+        trigger('CALM_RACE', 50000);
       }
     }
   }

@@ -253,15 +253,55 @@ export class GeminiEngineerClient {
       case 'CALM_RACE':
         return {
           shouldSpeak: true,
-          message: 'Tá tão calmo que parece passeio de domingo. Anda logo com essa lata velha!',
-          tone: 'humorous',
-          category: 'fun',
-          priority: 'FUN'
+          message: `Pista limpa na sua frente, ${driver}. Mantém esse ritmo e cuida dos pneus.`,
+          tone: 'calm',
+          category: 'pace',
+          priority: 'INFORMATIONAL'
+        };
+      case 'TYRE_TEMP_HIGH':
+        return {
+          shouldSpeak: true,
+          message: `Temperatura dos pneus subindo, ${driver}. Alivia nas curvas rápidas.`,
+          tone: 'tactical',
+          category: 'tyres',
+          priority: 'STRATEGIC'
+        };
+      case 'BRAKE_TEMP_HIGH':
+        return {
+          shouldSpeak: true,
+          message: `Temperatura dos freios no limite, ${driver}. Alivia na freada.`,
+          tone: 'urgent',
+          category: 'damage',
+          priority: 'HIGH'
+        };
+      case 'FUEL_LOW':
+        return {
+          shouldSpeak: true,
+          message: `Combustível no limite negativo, ${driver}. Faz lift and coast nessa volta.`,
+          tone: 'tactical',
+          category: 'fuel',
+          priority: 'STRATEGIC'
+        };
+      case 'ERS_FULL':
+        return {
+          shouldSpeak: true,
+          message: `Bateria cheia, ${driver}! Solta o modo ultrapassagem na reta!`,
+          tone: 'celebratory',
+          category: 'pace',
+          priority: 'HIGH'
+        };
+      case 'LAP_PACE':
+        return {
+          shouldSpeak: true,
+          message: `Bela volta, ${driver}! Mantém esse ritmo constante.`,
+          tone: 'calm',
+          category: 'pace',
+          priority: 'INFORMATIONAL'
         };
       default:
         return {
           shouldSpeak: true,
-          message: `${driver}, ritmo tá bom, só não faz cagada agora porra.`,
+          message: `${driver}, ritmo tá constante e sob controle. Foca no traçado.`,
           tone: 'calm',
           category: 'general',
           priority: 'INFORMATIONAL'

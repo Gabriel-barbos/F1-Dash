@@ -1,14 +1,22 @@
+import { CockpitTelemetryState } from '@f1-dash/telemetry-core';
 import { mobileAudioPlayer } from './mobile-audio-player';
 import { getClaudinhoClip, ClaudinhoClip } from './claudinho-clips';
 
 const API_KEY = 'AQ.Ab8RN6LgIEBTDjoOU0k7dj_BYMD9Slh6fjVUuZWpuS82HOCyyA';
 
 const CLAUDINHO_SYSTEM_PROMPT = `
-Você é o "Claudinho Ronaldo", engenheiro de corrida brasileiro de Fórmula 1 e melhor amigo de resenha do piloto Gabriel.
-Fale em português brasileiro, com resenha, palavrões naturais ("porra", "caralho", "puta que pariu", "merda", "moleque") e em no máximo 5 segundos (máximo 10 a 14 palavras).
-Sua fala deve ser curta, enérgica, espontânea e direta ao ponto.
-Nunca aja como assistente formal. Seja o parceiro de rádio raiz.
-Responda APENAS com o texto da fala no rádio, sem aspas, sem asteriscos e sem explicações.
+Você é o "Claudinho Ronaldo", engenheiro de corrida brasileiro de Fórmula 1 e parceiro de equipe de confiança do piloto Gabriel.
+
+DIRETRIZES DA SUA FALA NO RÁDIO:
+1. FOCO TÉCNICO E INFORMATIVO: Dê sempre informações úteis, concretas e acionáveis baseadas nos dados reais da telemetria enviados (desgaste dos pneus, temperatura, combustível, ritmo de volta, gaps de DRS e tráfego).
+2. USO EQUILIBRADO DE PALAVRÕES (NÃO FORCE):
+   - Palavrões ("porra", "caralho", "merda", "puta que pariu") devem ser usados COM PARCIMÔNIA, EXCLUSIVAMENTE em momentos de impacto real ou alta adrenalina: batida forte, dano grave, susto violento, bandeira vermelha ou ultrapassagem no limite.
+   - Em situações normais, calmas ou informativas (pneus, combustível, ritmo, gaps, boxes de rotina), NÃO use palavrões forçados. Seja firme, técnico, motivador e parceiro, usando gírias automobilísticas naturais do Brasil ("boa moleque", "olho no espelho", "administra a borracha", "traciona forte", "ritmo constante", "tempo roxo").
+3. PROIBIDO REPETIR BORDÕES:
+   - NUNCA use frases clichês repetitivas como "lata velha", "passeio de domingo" ou similares. Seja sempre variado e baseado nos dados do momento.
+4. FORMATO:
+   - Resposta curta de rádio: entre 8 e 14 palavras (máximo 4 a 5 segundos de fala).
+   - Responda APENAS com o texto da fala no rádio, sem aspas, sem asteriscos, sem emojis e sem explicações.
 `;
 
 const TTS_MODELS = [
@@ -37,15 +45,53 @@ export class ClaudinhoMobileService {
   private rateLimitUntil = 0;
 
   /**
-   * Gera texto dinâmico espontâneo com o Gemini 3.8 Flash.
+   * Constrói o contexto com dados reais da telemetria para a IA.
    */
-  private async fetchText(eventScenario: string, driverName: string): Promise<string | null> {
+  private buildTelemetryPrompt(eventScenario: string, driverName: string, telemetry?: Partial<CockpitTelemetryState>): string {
+    if (!telemetry) {
+      return `Situação na corrida: ${eventScenario}. O piloto se chama ${driverName}. Dê uma orientação de rádio útil, curta e direta baseada na situação.`;
+    }
+
+    const tyreWear = telemetry.tyresWear && telemetry.tyresWear.length >= 4 ? Math.max(...telemetry.tyresWear) : undefined;
+    const tyreTemp = telemetry.tyresSurfaceTemperature && telemetry.tyresSurfaceTemperature.length >= 4 ? Math.max(...telemetry.tyresSurfaceTemperature) : undefined;
+    const brakeTemp = telemetry.brakesTemperature && telemetry.brakesTemperature.length >= 4 ? Math.max(...telemetry.brakesTemperature) : undefined;
+    const lastLap = telemetry.lastLapTimeInMS && telemetry.lastLapTimeInMS > 0 ? `${(telemetry.lastLapTimeInMS / 1000).toFixed(2)}s` : undefined;
+    const bestLap = telemetry.bestLapTimeInMS && telemetry.bestLapTimeInMS > 0 ? `${(telemetry.bestLapTimeInMS / 1000).toFixed(2)}s` : undefined;
+    const gapFront = telemetry.deltaToCarInFrontInMS && telemetry.deltaToCarInFrontInMS > 0 ? `${(telemetry.deltaToCarInFrontInMS / 1000).toFixed(1)}s` : undefined;
+    const gapBehind = telemetry.deltaToCarBehindInMS && telemetry.deltaToCarBehindInMS > 0 ? `${(telemetry.deltaToCarBehindInMS / 1000).toFixed(1)}s` : undefined;
+    const fuelLaps = telemetry.fuelRemainingLaps !== undefined ? `${telemetry.fuelRemainingLaps >= 0 ? '+' : ''}${telemetry.fuelRemainingLaps.toFixed(1)} voltas` : undefined;
+    const ersPct = telemetry.ersPercentage !== undefined ? `${Math.round(telemetry.ersPercentage)}%` : undefined;
+
+    const parts: string[] = [
+      `Evento detectado: ${eventScenario}`,
+      `Piloto: ${driverName}`,
+      `Posição: P${telemetry.carPosition || 1} (Volta ${telemetry.currentLapNum || 1}${telemetry.totalLaps ? `/${telemetry.totalLaps}` : ''})`
+    ];
+
+    if (lastLap) parts.push(`Última volta: ${lastLap} (Melhor pessoal: ${bestLap || lastLap})`);
+    if (gapFront) parts.push(`Gap pro carro da frente: ${gapFront}`);
+    if (gapBehind) parts.push(`Gap pro carro de trás: ${gapBehind}`);
+    if (tyreWear !== undefined) parts.push(`Desgaste máx dos pneus: ${tyreWear}%`);
+    if (tyreTemp !== undefined) parts.push(`Temp pneus: ${tyreTemp}°C`);
+    if (brakeTemp !== undefined) parts.push(`Temp freios: ${brakeTemp}°C`);
+    if (fuelLaps) parts.push(`Combustível restante: ${fuelLaps}`);
+    if (ers) parts.push(`Bateria ERS: ${ersPct}`);
+
+    return `DADOS DA CORRIDA:\n${parts.join('\n')}\n\nInstrução: Dê uma instrução útil e direta ao piloto usando os dados acima. Se for uma situação de corrida normal/calma, informe sobre pneus, combustível, ritmo ou gaps. Seja parceiro e técnico. Palavrão SOMENTE se for batida ou perigo iminente. Nunca use frases clichês como "lata velha".`;
+  }
+
+  /**
+   * Gera texto dinâmico espontâneo e útil com o Gemini 3.8 Flash.
+   */
+  private async fetchText(eventScenario: string, driverName: string, telemetry?: Partial<CockpitTelemetryState>): Promise<string | null> {
     if (Date.now() < this.rateLimitUntil) {
       return null; // Quota em cooldown: usa fallback local instantâneo sem travar o Wi-Fi
     }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2800);
+    const userPromptText = this.buildTelemetryPrompt(eventScenario, driverName, telemetry);
+
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${API_KEY}`,
@@ -59,7 +105,7 @@ export class ClaudinhoMobileService {
               {
                 parts: [
                   {
-                    text: `Situação na corrida: ${eventScenario}. O piloto se chama ${driverName}. Manda uma fala curta e da resenha!`
+                    text: userPromptText
                   }
                 ]
               }
@@ -205,7 +251,8 @@ export class ClaudinhoMobileService {
   public async triggerRadio(
     eventScenario: string = 'OVERTAKE',
     driverName: string = 'Gabriel',
-    callbacks: RadioCallbacks = {}
+    callbacks: RadioCallbacks = {},
+    telemetry?: Partial<CockpitTelemetryState>
   ): Promise<RadioTransmissionResult> {
     if (this.isTransmitting) {
       return { message: '', tone: 'calm', priority: 'LOW', category: eventScenario };
@@ -215,8 +262,8 @@ export class ClaudinhoMobileService {
     let finalMessage = '';
 
     try {
-      // 1. Tenta obter fala dinâmica inédita via Gemini Flash
-      let generatedText = await this.fetchText(eventScenario, driverName);
+      // 1. Tenta obter fala dinâmica inédita e informativa via Gemini Flash
+      let generatedText = await this.fetchText(eventScenario, driverName, telemetry);
       let dynamicWavBase64: string | null = null;
 
       if (generatedText) {
