@@ -1,1 +1,7 @@
-node_modules    
+node_modules
+.codegraph/
+*.log
+.pio/
+esp32-fw/.pio/
+esp32-fw/.codegraph/
+esp32-fw/.vscode/

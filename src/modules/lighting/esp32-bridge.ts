@@ -17,7 +17,7 @@ export class Esp32LightingBridge {
 
   constructor(config?: Partial<Esp32BridgeConfig>) {
     this.config = {
-      ipAddress: config?.ipAddress ?? '192.168.1.150',
+      ipAddress: config?.ipAddress ?? '192.168.1.103',
       port: config?.port ?? 4210,
       transport: config?.transport ?? 'UDP',
       wledPresetMapping: config?.wledPresetMapping ?? {
