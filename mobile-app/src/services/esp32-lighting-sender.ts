@@ -114,28 +114,14 @@ class Esp32LightingSender {
         }
         this.dispatch(this.latestPayload);
       }
-    }, 150);
+    }, 50);
   }
 
   private async initUdpSockets() {
     if ((this.expoSocket || this.rnSocket) || this.initializingSocket) return;
     this.initializingSocket = true;
 
-    // 1. Inicializa react-native-udp (dgram) — canal nativo independente da recepção 20777
-    try {
-      // @ts-ignore
-      const dgram = require('react-native-udp');
-      if (dgram && typeof dgram.createSocket === 'function') {
-        const sock = dgram.createSocket({ type: 'udp4' });
-        try {
-          sock.bind(0, '0.0.0.0');
-        } catch {}
-        this.rnSocket = sock;
-        console.log('[ESP32 Sender] Socket UDP Dgram independente inicializado.');
-      }
-    } catch {}
-
-    // 2. Inicializa @isvend/expo-udp com envio IO fire-and-forget
+    // 1. Inicializa @isvend/expo-udp como canal nativo primário de ultra-baixa latência (C++/Kotlin JSI direto)
     try {
       // @ts-ignore
       const expoUdp = require('@isvend/expo-udp');
@@ -145,10 +131,34 @@ class Esp32LightingSender {
           reuseAddress: true,
           reusePort: true
         });
+        // BIND EXPLÍCITO A 0.0.0.0:0:
+        // Fundamental no Android para alocar o socket nativo imediatamente na interface de rede
+        // e evitar atrasos de resolução de rota ou erros silenciosos de socket unbound!
+        try {
+          await sock.bind({ port: 0, address: '0.0.0.0' });
+        } catch {}
         this.expoSocket = sock;
-        console.log('[ESP32 Sender] Socket UDP Expo inicializado.');
+        console.log('[ESP32 Sender] Socket UDP Expo nativo inicializado e vinculado com sucesso.');
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[ESP32 Sender] expo-udp não disponível, inicializando fallback react-native-udp:', e);
+    }
+
+    // 2. Fallback react-native-udp (apenas se expo-udp não estiver disponível)
+    if (!this.expoSocket) {
+      try {
+        // @ts-ignore
+        const dgram = require('react-native-udp');
+        if (dgram && typeof dgram.createSocket === 'function') {
+          const sock = dgram.createSocket({ type: 'udp4' });
+          try {
+            sock.bind(0, '0.0.0.0');
+          } catch {}
+          this.rnSocket = sock;
+          console.log('[ESP32 Sender] Socket UDP Fallback (Dgram) inicializado.');
+        }
+      } catch {}
+    }
 
     this.initializingSocket = false;
   }
@@ -320,7 +330,10 @@ class Esp32LightingSender {
     const priorityHash = `${payload.ambient}_${payload.waiting}_${payload.weather}_${payload.trackStatus}_${payload.overtake}_${payload.activeAero}_${payload.drsActive}_${payload.pitLimiter}_${payload.inPits}_${payload.isCrash}_${payload.engineBlown}_${payload.chequeredFlag}`;
 
     const isPriorityChanged = priorityHash !== this.lastPriorityHash;
-    const isUdpHeartbeatDue = now - this.lastUdpSendTime >= 120; // ~8.3 Hz contínuo via UDP puro
+    // Transmissão contínua em alta taxa (25 Hz / a cada 40ms):
+    // Mantém o chip Wi-Fi do celular em estado ativo contínuo (sem entrar em power save)
+    // e garante que qualquer frame seja refletido em < 40ms mesmo em caso de oscilação momentânea
+    const isUdpHeartbeatDue = now - this.lastUdpSendTime >= 40;
 
     if (!isPriorityChanged && !isUdpHeartbeatDue) {
       return;
@@ -332,11 +345,10 @@ class Esp32LightingSender {
     const jsonStr = JSON.stringify(payload);
 
     if (isPriorityChanged) {
-      // TRANSIÇÃO DE ESTADO CRÍTICA (ex: entrou na zona de Modo Reta ou habilitou Overtake <1s):
-      // Usa SOMENTE rajada UDP pura (0ms, +10ms, +25ms, +45ms, +75ms) na porta 4210!
-      // NÃO abre conexão TCP HTTP durante a corrida para jamais travar o loop single-thread do WebServer no ESP32!
+      // TRANSIÇÃO DE ESTADO CRÍTICA (Reta, DRS, Overtake, Bandeiras, Boxes, Batida):
+      // Disparo imediato (0ms) + rajada leve de redundância (+15ms, +35ms, +60ms)
       this.sendUdp(jsonStr, true);
-      for (const delayMs of [10, 25, 45, 75]) {
+      for (const delayMs of [15, 35, 60]) {
         setTimeout(() => {
           if (this.latestPayload) {
             this.sendUdp(JSON.stringify(this.latestPayload), true);
@@ -344,7 +356,7 @@ class Esp32LightingSender {
         }, delayMs);
       }
     } else {
-      // Heartbeat regular via UDP puro
+      // Fluxo contínuo regular via UDP puro a 25 Hz
       this.sendUdp(jsonStr, false);
     }
   }
@@ -361,18 +373,7 @@ class Esp32LightingSender {
         bytes[i] = jsonStr.charCodeAt(i) & 0xff;
       }
 
-      // Envio paralelo de altíssima confiabilidade: dispara via react-native-udp E expo-udp
-      if (this.rnSocket) {
-        try {
-          this.rnSocket.send(bytes, 0, bytes.length, this.esp32Port, this.esp32Ip, (err: any) => {
-            if (!err) {
-              this.packetsSentCount++;
-              this.lastSuccessTime = Date.now();
-            }
-          });
-        } catch {}
-      }
-
+      // 1. Canal Primário: @isvend/expo-udp (JSI Nativo Direto — Sem base64, sem criar Threads extras no Android)
       if (this.expoSocket) {
         this.expoSocket
           .send(bytes, {
@@ -384,7 +385,28 @@ class Esp32LightingSender {
             this.packetsSentCount++;
             this.lastSuccessTime = Date.now();
           })
-          .catch(() => {});
+          .catch((err: any) => {
+            this.lastError = `Expo UDP: ${err?.message || err}`;
+            // Se expoSocket falhar pontualmente, despacha pelo fallback dgram
+            if (this.rnSocket) {
+              try {
+                this.rnSocket.send(bytes, 0, bytes.length, this.esp32Port, this.esp32Ip);
+              } catch {}
+            }
+          });
+        return;
+      }
+
+      // 2. Canal Fallback: react-native-udp (Dgram)
+      if (this.rnSocket) {
+        try {
+          this.rnSocket.send(bytes, 0, bytes.length, this.esp32Port, this.esp32Ip, (err: any) => {
+            if (!err) {
+              this.packetsSentCount++;
+              this.lastSuccessTime = Date.now();
+            }
+          });
+        } catch {}
       }
     } catch (e: any) {
       this.lastError = `Send exception: ${e?.message || e}`;
