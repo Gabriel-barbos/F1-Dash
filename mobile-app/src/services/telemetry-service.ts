@@ -13,6 +13,7 @@ import {
 import Constants from 'expo-constants';
 import { nativeUdpReceiver, isRunningInExpoGo, isNativeUdpSupported } from './native-udp-receiver';
 import { raceEngineerDetector } from './race-engineer-detector';
+import { esp32LightingSender } from './esp32-lighting-sender';
 
 export type TelemetryCallback = (state: CockpitTelemetryState) => void;
 
@@ -70,8 +71,31 @@ class TelemetryService {
     this.storeUnsub = store.subscribe((raceState) => {
       if (this.mode === 'UDP_NATIVE' && raceState.connection.connected) {
         const now = Date.now();
-        // Notificação da UI suave a 30 FPS (a cada 33ms) para manter o thread JS do Hermes desimpedido
-        if (now - this.lastUiUpdate >= 33) {
+        const hasPriorityChange =
+          raceState.car.activeAeroMode !== this.currentState.activeAeroMode ||
+          raceState.car.activeAeroAvailable !== this.currentState.activeAeroAvailable ||
+          ((raceState.car.activeAeroActivationDistance === 0) !== (this.currentState.activeAeroActivationDistance === 0)) ||
+          raceState.car.overtakeActive !== this.currentState.overtakeActive ||
+          raceState.car.overtakeAvailable !== this.currentState.overtakeAvailable ||
+          ((raceState.car.overtakeActivationDistance === 0) !== (this.currentState.overtakeActivationDistance === 0)) ||
+          raceState.car.drsActive !== this.currentState.drsActive ||
+          raceState.car.drsAllowed !== this.currentState.drsAllowed ||
+          raceState.ers.deployMode !== this.currentState.ersDeployMode ||
+          raceState.session.safetyCarStatus !== this.currentState.safetyCarStatus ||
+          raceState.session.isRedFlagActive !== this.currentState.isRedFlagActive ||
+          raceState.pit.limiterActive !== this.currentState.pitLimiterActive ||
+          raceState.pit.status !== this.currentState.pitStatus ||
+          raceState.session.fiaFlag !== this.currentState.vehicleFiaFlags ||
+          raceState.damage.engineBlown !== this.currentState.engineBlown ||
+          raceState.damage.frontLeftWing !== this.currentState.frontLeftWingDamage ||
+          raceState.damage.frontRightWing !== this.currentState.frontRightWingDamage ||
+          raceState.damage.rearWing !== this.currentState.rearWingDamage ||
+          raceState.damage.floor !== this.currentState.floorDamage ||
+          raceState.session.weather !== this.currentState.weather ||
+          raceState.timing.currentLap !== this.currentState.currentLapNum;
+
+        // Notificação imediata (0ms) em transições de modo (Reta, Overtake, Bandeiras) ou a 30 FPS (33ms)
+        if (hasPriorityChange || now - this.lastUiUpdate >= 33) {
           this.lastUiUpdate = now;
           const cockpitState = toCockpitTelemetryState(raceState);
           this.currentState = cockpitState;
@@ -118,6 +142,9 @@ class TelemetryService {
   }
 
   private notify() {
+    if (this.currentState.connected) {
+      esp32LightingSender.updateFromTelemetry(this.currentState);
+    }
     for (const listener of this.listeners) {
       listener(this.currentState);
     }
@@ -128,7 +155,10 @@ class TelemetryService {
     if (this.mode === 'UDP_NATIVE') {
       this.stopInternalMock();
       this.disconnectWs();
+      const raceState = TelemetryStore.getInstance().getState();
+      this.currentState.connected = !!raceState.connection.connected;
       this.startNativeUdp();
+      this.notify();
     } else if (this.mode === 'WEBSOCKET') {
       this.stopInternalMock();
       this.stopNativeUdp();
@@ -281,8 +311,6 @@ class TelemetryService {
       const revPercent = Math.min(100, Math.max(0, ((rpm - 4000) / (13500 - 4000)) * 100));
       const ersPercent = Math.max(10, 100 - (tick % 300) * 0.3);
 
-      const isNormal = this.currentScenario === 'NORMAL';
-
       let currentSpeed = Math.round(speed);
       let currentGear = gear;
       let currentRpm = rpm;
@@ -311,7 +339,6 @@ class TelemetryService {
         revLightsPercent: revPercent,
         ersPercentage: ersPercent,
         currentLapTimeInMS: currentLapTime,
-        // Só alterna DRS/Overtake dinamicamente no mock se for explicitamente modo DRS ou OVERTAKE
         drsActive: this.currentScenario === 'DRS',
         drsAllowed: this.currentScenario === 'DRS',
         activeAeroMode: this.currentScenario === 'DRS' ? 1 : 0,

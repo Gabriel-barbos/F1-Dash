@@ -19,9 +19,11 @@ import {
   Wifi,
   CheckCircle2,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Lightbulb
 } from 'lucide-react-native';
 import { telemetryService, ConnectionMode, MomentaryEventType } from '../services/telemetry-service';
+import { esp32LightingSender } from '../services/esp32-lighting-sender';
 import { CockpitTelemetryState, INITIAL_COCKPIT_TELEMETRY_STATE } from '@f1-dash/telemetry-core';
 
 interface MenuScreenProps {
@@ -36,7 +38,19 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
   const [connMode, setConnMode] = useState<ConnectionMode>(telemetryService.getMode());
   const [hostInput, setHostInput] = useState<string>(telemetryService.getServerHost());
   const [deviceIp, setDeviceIp] = useState<string>('Obtendo IP...');
+  const [esp32IpInput, setEsp32IpInput] = useState<string>(esp32LightingSender.getTargetIp());
+  const [esp32Testing, setEsp32Testing] = useState<boolean>(false);
+  const [esp32TestResult, setEsp32TestResult] = useState<{ success: boolean; message: string } | null>(null);
   const isExpo = telemetryService.isExpoGo();
+
+  const handleTestEsp32 = async () => {
+    setEsp32Testing(true);
+    setEsp32TestResult(null);
+    esp32LightingSender.setTargetIp(esp32IpInput);
+    const res = await esp32LightingSender.testConnection();
+    setEsp32TestResult(res);
+    setEsp32Testing(false);
+  };
 
   useEffect(() => {
     Network.getIpAddressAsync()
@@ -225,6 +239,59 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
               </View>
             </View>
           </TouchableOpacity>
+        </View>
+
+        {/* Card de Configuração e Teste das Fitas LED ESP32 */}
+        <View style={styles.esp32Box}>
+          <View style={styles.esp32Header}>
+            <View style={styles.esp32HeaderLeft}>
+              <Lightbulb size={20} color="#f59e0b" strokeWidth={2.5} />
+              <Text style={styles.esp32Title}>ILUMINAÇÃO G7 DESK F1 (ESP32)</Text>
+            </View>
+            <View style={[styles.esp32Badge, esp32TestResult?.success ? styles.badgeSuccess : styles.badgeDefault]}>
+              <Text style={styles.esp32BadgeText}>
+                {esp32TestResult?.success ? '🟢 CONECTADO' : 'PORTA 4210'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.esp32Subtitle}>
+            Envia efeitos de corrida (DRS, Overtake, Chuva, Batida) direto para as fitas LED na mesa.
+          </Text>
+
+          <View style={styles.inputActionRow}>
+            <TextInput
+              value={esp32IpInput}
+              onChangeText={(text) => {
+                setEsp32IpInput(text);
+                esp32LightingSender.setTargetIp(text);
+              }}
+              placeholder="IP do ESP32 (Padrão: 192.168.1.103)"
+              placeholderTextColor="#64748b"
+              style={styles.ipInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.connectBtn, esp32Testing && { opacity: 0.6 }]}
+              onPress={handleTestEsp32}
+              disabled={esp32Testing}
+              activeOpacity={0.8}
+            >
+              <RefreshCw size={14} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.connectBtnText}>
+                {esp32Testing ? 'TESTANDO...' : 'TESTAR FITAS'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {esp32TestResult && (
+            <View style={[styles.testResultBox, esp32TestResult.success ? styles.testResultSuccess : styles.testResultError]}>
+              <Text style={[styles.testResultText, { color: esp32TestResult.success ? '#22c55e' : '#f87171' }]}>
+                {esp32TestResult.message}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Instruções Rápidas de Configuração */}
@@ -491,6 +558,71 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5
+  },
+  esp32Box: {
+    backgroundColor: '#0d1322',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+    marginBottom: 8
+  },
+  esp32Header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  esp32HeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  esp32Title: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  esp32Subtitle: {
+    color: '#94a3b8',
+    fontSize: 11,
+    lineHeight: 15
+  },
+  esp32Badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  badgeDefault: {
+    backgroundColor: '#1e293b'
+  },
+  badgeSuccess: {
+    backgroundColor: '#064e3b'
+  },
+  esp32BadgeText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '800'
+  },
+  testResultBox: {
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 2
+  },
+  testResultSuccess: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)'
+  },
+  testResultError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)'
+  },
+  testResultText: {
+    fontSize: 11,
+    fontWeight: '700'
   },
   instructionsBox: {
     backgroundColor: '#090d18',

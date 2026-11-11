@@ -55,13 +55,21 @@ function determineCockpitState(state: CockpitTelemetryState): CockpitStateKey {
     return CockpitStateKey.PIT_LANE;
   }
 
-  // P6 — Modo Overtake (2026 Overtake ativo ou ERS Overtake em 2025)
-  if (state.is2026Regulations ? state.overtakeActive : state.ersDeployMode === ERSDeployMode.Overtake) {
+  // P6 — Modo Overtake (2026 Override/Overtake ou 2025 ERS Deploy Mode 3 Overtake)
+  if (
+    state.overtakeActive ||
+    state.ersDeployMode === ERSDeployMode.Overtake ||
+    (state.overtakeAvailable && (state.overtakeActivationDistance ?? 0) === 0)
+  ) {
     return CockpitStateKey.OVERTAKE;
   }
 
-  // P7 — Modo Reta (2026 Straight Mode / X-Mode ativo ou DRS aberto em 2025)
-  if (state.is2026Regulations ? state.activeAeroMode === 1 : state.drsActive) {
+  // P7 — Modo Reta (2026 Straight Mode / X-Mode na zona ou ativo, ou DRS aberto)
+  if (
+    state.activeAeroMode === 1 ||
+    state.drsActive ||
+    (state.activeAeroAvailable && (state.activeAeroActivationDistance ?? 0) === 0)
+  ) {
     return CockpitStateKey.STRAIGHT_MODE;
   }
 
@@ -152,7 +160,9 @@ export const COCKPIT_THEME_DEPS = [
   'bestLapTimeInMS',
   'overtakeActive',
   'overtakeAvailable',
+  'overtakeActivationDistance',
   'activeAeroMode',
   'activeAeroAvailable',
+  'activeAeroActivationDistance',
   'is2026Regulations',
 ] as const satisfies ReadonlyArray<keyof CockpitTelemetryState>;

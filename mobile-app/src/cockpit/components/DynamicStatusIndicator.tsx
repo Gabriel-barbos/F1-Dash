@@ -70,7 +70,7 @@ export const DynamicStatusIndicator: React.FC<DynamicStatusIndicatorProps> = mem
     if (activeAeroMode === 1) {
       currentStatus = {
         id: 'AERO_ACTIVE',
-        label: 'ACTIVE AERO · X-MODE',
+        label: 'MODO RETA',
         color: '#9D5CFF',
         iconColor: '#ffffff',
         icon: 'wind',

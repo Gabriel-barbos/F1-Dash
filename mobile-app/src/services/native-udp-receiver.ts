@@ -42,8 +42,8 @@ const COCKPIT_PACKET_IDS = new Set([
  * Lê o byte no offset 6 do buffer bruto (PacketId) sem alocar objetos.
  * Retorna -1 se o buffer for muito pequeno.
  */
-function peekPacketIdRaw(data: Uint8Array): number {
-  if (data.length < 7) return -1;
+function peekPacketIdRaw(data: ArrayLike<number>): number {
+  if (!data || data.length < 7) return -1;
   return data[6];
 }
 
@@ -77,12 +77,14 @@ export class NativeUdpReceiver {
         this.subscription = this.socket.addListener('message', (event: any) => {
           try {
             if (!event || !event.data) return;
+
+            // Filtro rápido por Packet ID ANTES de alocar Uint8Array:
+            // descarta Motion/Participants sem copiar 1400 bytes no JS
+            const packetId = peekPacketIdRaw(event.data);
+            if (!COCKPIT_PACKET_IDS.has(packetId)) return;
+
             const buffer =
               event.data instanceof Uint8Array ? event.data : new Uint8Array(event.data);
-
-            // Filtro rápido por Packet ID: descarta Motion/Participants sem alocar objetos
-            const packetId = peekPacketIdRaw(buffer);
-            if (!COCKPIT_PACKET_IDS.has(packetId)) return;
 
             // Decodifica diretamente sem perder nenhum pacote legítimo
             const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
@@ -118,6 +120,7 @@ export class NativeUdpReceiver {
           try {
             let buffer: Uint8Array;
             if (typeof msg === 'string') {
+              if (msg.length < 7 || !COCKPIT_PACKET_IDS.has(msg.charCodeAt(6) & 0xff)) return;
               const len = msg.length;
               buffer = new Uint8Array(len);
               for (let i = 0; i < len; i++) {
@@ -125,13 +128,11 @@ export class NativeUdpReceiver {
               }
             } else if (msg instanceof ArrayBuffer) {
               buffer = new Uint8Array(msg);
+              if (!COCKPIT_PACKET_IDS.has(peekPacketIdRaw(buffer))) return;
             } else {
+              if (!COCKPIT_PACKET_IDS.has(peekPacketIdRaw(msg))) return;
               buffer = msg;
             }
-
-            // Filtro rápido por Packet ID
-            const packetId = peekPacketIdRaw(buffer);
-            if (!COCKPIT_PACKET_IDS.has(packetId)) return;
 
             const parsed = ParserRegistry.parse(buffer, { playerOnly: true });
             if (parsed) {

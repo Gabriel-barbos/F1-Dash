@@ -11,11 +11,13 @@
     },
     "android": {
       "package": "com.f1cockpit.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#09090b"
       }
     },
     "plugins": [
+      "./plugins/withCleartextTraffic",
       "expo-asset",
       [
         "@isvend/expo-udp",
