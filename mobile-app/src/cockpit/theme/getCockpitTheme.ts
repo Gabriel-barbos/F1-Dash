@@ -55,10 +55,9 @@ function determineCockpitState(state: CockpitTelemetryState): CockpitStateKey {
     return CockpitStateKey.PIT_LANE;
   }
 
-  // P6 — Modo Overtake (2026 Override/Overtake ou 2025 ERS Deploy Mode 3 Overtake)
+  // P6 — Modo Overtake (SOMENTE quando a < 1s do carro da frente com Overtake ativo / disponível; NUNCA por botão comum de ERS)
   if (
     state.overtakeActive ||
-    state.ersDeployMode === ERSDeployMode.Overtake ||
     (state.overtakeAvailable && (state.overtakeActivationDistance ?? 0) === 0)
   ) {
     return CockpitStateKey.OVERTAKE;

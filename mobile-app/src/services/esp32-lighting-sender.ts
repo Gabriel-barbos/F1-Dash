@@ -145,9 +145,6 @@ class Esp32LightingSender {
           reuseAddress: true,
           reusePort: true
         });
-        try {
-          await sock.bind({ port: 0, address: '0.0.0.0' });
-        } catch {}
         this.expoSocket = sock;
         console.log('[ESP32 Sender] Socket UDP Expo inicializado.');
       }
@@ -264,12 +261,11 @@ class Esp32LightingSender {
       }
     }
 
-    // 6. Modo Overtake (Tanto no Regulamento 2026 quanto no botão de ERS/Overtake do Regulamento 2025):
+    // 6. Modo Overtake (Apenas quando a < 1s do carro da frente no Regulamento 2026 com Overtake habilitado/ativo; NUNCA pelo botão normal de ERS):
     const overtake =
       !isWaiting &&
       Boolean(
         telemetry.overtakeActive ||
-        telemetry.ersDeployMode === 3 ||
         (telemetry.overtakeAvailable && (telemetry.overtakeActivationDistance ?? 0) === 0)
       );
 
@@ -365,7 +361,18 @@ class Esp32LightingSender {
         bytes[i] = jsonStr.charCodeAt(i) & 0xff;
       }
 
-      // Prioriza expo-udp que já está vinculado e otimizado no build
+      // Envio paralelo de altíssima confiabilidade: dispara via react-native-udp E expo-udp
+      if (this.rnSocket) {
+        try {
+          this.rnSocket.send(bytes, 0, bytes.length, this.esp32Port, this.esp32Ip, (err: any) => {
+            if (!err) {
+              this.packetsSentCount++;
+              this.lastSuccessTime = Date.now();
+            }
+          });
+        } catch {}
+      }
+
       if (this.expoSocket) {
         this.expoSocket
           .send(bytes, {
@@ -378,13 +385,6 @@ class Esp32LightingSender {
             this.lastSuccessTime = Date.now();
           })
           .catch(() => {});
-      } else if (this.rnSocket) {
-        this.rnSocket.send(bytes, 0, bytes.length, this.esp32Port, this.esp32Ip, (err: any) => {
-          if (!err) {
-            this.packetsSentCount++;
-            this.lastSuccessTime = Date.now();
-          }
-        });
       }
     } catch (e: any) {
       this.lastError = `Send exception: ${e?.message || e}`;
