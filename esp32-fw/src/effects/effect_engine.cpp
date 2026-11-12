@@ -13,10 +13,104 @@ void EffectEngine::begin() {
     }
     lightningActive_ = false;
     nextLightningMs_ = 0;
-    Serial.println("[Effect Engine] Motor de efeitos F1 e ambiente inicializado (v2 Suavizado)");
+    currentEffect_ = EffectId::NONE;
+    inTransition_ = false;
+    transitionStartTimeMs_ = 0;
+    transitionDurationMs_ = 0;
+    for (size_t i = 0; i < MAX_STRIP_SNAPSHOT_LEDS; ++i) {
+        snapshotLeft_[i] = ColorRGBCCT::Black();
+        snapshotRight_[i] = ColorRGBCCT::Black();
+    }
+    snapshotAnalog_ = ColorRGB::Black();
+    Serial.println("[Effect Engine] Motor de efeitos F1 e ambiente inicializado (v2 com Cross-Fade Suave)");
+}
+
+uint32_t EffectEngine::getTransitionDuration(EffectId from, EffectId to) {
+    // 1. Emergências e Alertas Críticos: 0 ms (Instantâneo)
+    if (to == EffectId::INCIDENT_CRASH || 
+        to == EffectId::FLAG_RED || 
+        to == EffectId::INCIDENT_ENGINE_BLOWN ||
+        to == EffectId::SHIFT_FLASH) {
+        return 0;
+    }
+    if (from == EffectId::INCIDENT_CRASH || from == EffectId::SHIFT_FLASH) {
+        return 80;
+    }
+
+    // 2. Retorno ao estado de repouso / Iluminação Ambiente (Branco Quente / Noturno)
+    // Ex: Saiu da reta (Roxo -> Branco Quente), Saiu dos boxes, Fim do Overtake
+    if (to == EffectId::AMBIENT_DAY || to == EffectId::AMBIENT_NIGHT || to == EffectId::AMBIENT_WAITING) {
+        return Config::Firmware::TRANSITION_TO_AMBIENT_MS;
+    }
+
+    // 3. Entrada em modos de performance dinâmicos (Modo Reta / Overtake Boost)
+    if (to == EffectId::ACTIVE_AERO_STRAIGHT || to == EffectId::OVERTAKE_BOOST) {
+        return Config::Firmware::TRANSITION_MOTORSPORT_MS;
+    }
+
+    // 4. Transições entre outros modos ativos (ex: Overtake -> Boxes, Bandeira Amarela -> Safety Car, etc.)
+    return Config::Firmware::TRANSITION_INTER_EFFECT_MS;
+}
+
+void EffectEngine::applyTransitionBlend(uint32_t nowMs) {
+    if (!inTransition_) return;
+
+    uint32_t elapsed = nowMs - transitionStartTimeMs_;
+    if (elapsed >= transitionDurationMs_) {
+        inTransition_ = false;
+        return;
+    }
+
+    float progress = static_cast<float>(elapsed) / static_cast<float>(transitionDurationMs_);
+    // Curva Smoothstep cúbica (3t^2 - 2t^3) para início e desaceleração orgânicos
+    float t = progress * progress * (3.0f - 2.0f * progress);
+
+    uint16_t leftCount = leds_.getLeftCount();
+    uint16_t rightCount = leds_.getRightCount();
+
+    for (uint16_t i = 0; i < leftCount && i < MAX_STRIP_SNAPSHOT_LEDS; ++i) {
+        ColorRGBCCT target = leds_.getLeftPixel(i);
+        leds_.setLeftPixel(i, ColorRGBCCT::lerp(snapshotLeft_[i], target, t));
+    }
+
+    for (uint16_t i = 0; i < rightCount && i < MAX_STRIP_SNAPSHOT_LEDS; ++i) {
+        ColorRGBCCT target = leds_.getRightPixel(i);
+        leds_.setRightPixel(i, ColorRGBCCT::lerp(snapshotRight_[i], target, t));
+    }
+
+    ColorRGB targetAnalog = leds_.getAnalogRgb();
+    leds_.setAnalogRgb(ColorRGB::lerp(snapshotAnalog_, targetAnalog, t));
 }
 
 void EffectEngine::render(uint32_t nowMs, const State::RaceStateSnapshot& telemetry, const State::ActiveEventState& eventState) {
+    EffectId nextEffect = eventState.primaryEffect;
+
+    // Detecta mudança de efeito para iniciar cross-fade suave
+    if (nextEffect != currentEffect_) {
+        if (currentEffect_ != EffectId::NONE) {
+            uint32_t duration = getTransitionDuration(currentEffect_, nextEffect);
+            if (duration > 0) {
+                // Captura o estado visual atual das fitas antes da renderização do novo efeito
+                uint16_t leftCount = leds_.getLeftCount();
+                uint16_t rightCount = leds_.getRightCount();
+                for (uint16_t i = 0; i < leftCount && i < MAX_STRIP_SNAPSHOT_LEDS; ++i) {
+                    snapshotLeft_[i] = leds_.getLeftPixel(i);
+                }
+                for (uint16_t i = 0; i < rightCount && i < MAX_STRIP_SNAPSHOT_LEDS; ++i) {
+                    snapshotRight_[i] = leds_.getRightPixel(i);
+                }
+                snapshotAnalog_ = leds_.getAnalogRgb();
+
+                transitionStartTimeMs_ = nowMs;
+                transitionDurationMs_ = duration;
+                inTransition_ = true;
+            } else {
+                inTransition_ = false;
+            }
+        }
+        currentEffect_ = nextEffect;
+    }
+
     uint32_t startMs = eventState.effectStartTimeMs;
 
     switch (eventState.primaryEffect) {
@@ -78,6 +172,9 @@ void EffectEngine::render(uint32_t nowMs, const State::RaceStateSnapshot& teleme
             renderAmbientDay(nowMs, startMs);
             break;
     }
+
+    // Aplica a interpolação suave (cross-fade) se estiver em transição
+    applyTransitionBlend(nowMs);
 
     // Aplica o overlay de Shift Flash periférico se estiver ativo na telemetria
     if (eventState.overlayShiftFlash && eventState.primaryEffect != EffectId::SHIFT_FLASH) {

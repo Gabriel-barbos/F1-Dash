@@ -43,6 +43,9 @@ namespace Firmware {
     // Transições de Fade
     // -------------------------------------------------------------
     constexpr uint32_t MODE_TRANSITION_FADE_MS = 600; // 600 ms de fade suave entre modos
+    constexpr uint32_t TRANSITION_TO_AMBIENT_MS      = 380; // 380 ms para acalmar suavemente até o branco quente
+    constexpr uint32_t TRANSITION_MOTORSPORT_MS      = 120; // 120 ms rápido para entrar em Modo Reta / Overtake
+    constexpr uint32_t TRANSITION_INTER_EFFECT_MS    = 250; // 250 ms entre efeitos ativos (ex: Overtake -> Boxes)
 
 } // namespace Firmware
 } // namespace Config

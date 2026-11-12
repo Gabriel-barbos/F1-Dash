@@ -36,8 +36,20 @@ public:
 
 private:
     void applyShiftFlashOverlay(uint32_t nowMs);
+    uint32_t getTransitionDuration(EffectId from, EffectId to);
+    void applyTransitionBlend(uint32_t nowMs);
 
     Leds::ILedController& leds_;
+
+    // Controle de transições suaves (Cross-Fade Inteligente entre efeitos)
+    static constexpr size_t MAX_STRIP_SNAPSHOT_LEDS = 100;
+    EffectId currentEffect_ = EffectId::NONE;
+    bool inTransition_ = false;
+    uint32_t transitionStartTimeMs_ = 0;
+    uint32_t transitionDurationMs_ = 0;
+    ColorRGBCCT snapshotLeft_[MAX_STRIP_SNAPSHOT_LEDS];
+    ColorRGBCCT snapshotRight_[MAX_STRIP_SNAPSHOT_LEDS];
+    ColorRGB snapshotAnalog_;
 
     // Variáveis internas para animação de chuva orgânica (fade-in / pico / fade-out)
     static constexpr size_t MAX_RAINDROPS = 12;
