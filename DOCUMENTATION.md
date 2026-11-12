@@ -1,219 +1,187 @@
-# 🏎️ F1 Telemetry Dashboard — Arquitetura, Conceito e Roadmap
+# 📚 Documentação Técnica de Engenharia: F1 Telemetry Ecosystem
 
-Documento técnico e conceitual do projeto de telemetria em tempo real para o **EA SPORTS™ F1® 25 no PlayStation 5**, desenvolvido em TypeScript e Node.js, com evolução planejada para um aplicativo nativo em **React Native (Android APK)**.
-
----
-
-# PARTE 1 — Proposta, Ideia do Projeto e Conceito
-
-## 1.1 Visão Geral e Motivação
-Pilotos virtuais e entusiastas de automobilismo frequentemente necessitam de informações críticas de corrida durante a pilotagem — como distribuição de freio, desgaste de pneus, temperatura de superfície e carcaça, energia do ERS (bateria híbrida), tempos de setor e danos aerodinâmicos — que muitas vezes ocupam a visão na tela principal da TV ou exigem navegação manual nos menus MFD do volante.
-
-Soluções comerciais existentes (como SIM Dashboard) muitas vezes exigem assinaturas, configurações complexas ou dependem de servidores externos. 
-
-O **F1 Telemetry Dashboard** nasce como uma solução **100% pessoal, autônoma, gratuita e de altíssima fidelidade**, inspirada nos volantes reais de Fórmula 1 e nas telas de telemetria de engenharia (MoTeC / Cosworth).
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                             REDE LOCAL (WI-FI)                           │
-│                                                                          │
-│  ┌───────────────────────┐                    ┌───────────────────────┐  │
-│  │     PS5 (F1 25)       │                    │    Dispositivo Alvo   │  │
-│  │                       │ ── UDP Telemetry ─►│   (PC / Smartphone)   │  │
-│  │ Formato 2026 (60 Hz)  │    (Porta 20777)   │   Receptor + Parser   │  │
-│  └───────────────────────┘                    │       Dashboard       │  │
-│                                               └───────────────────────┘  │
-│                                                                          │
-│                     SEM CLOUD • SEM SERVIDORES • SEM INTERNET            │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-## 1.2 Princípios e Filosofia de Design
-1. **Comunicação Não Invasiva e Oficial**: Não há tentativa de modificação do jogo, engenharia reversa de hardware ou conexão direta ao console. Todo o fluxo utiliza o protocolo UDP oficial da Codemasters/EA Sports.
-2. **Custo Zero e Autonomia Local**: O sistema opera exclusivamente na rede local (Wi-Fi/Ethernet). Nenhum dado sai para a internet, não há servidores cloud, nem mensalidades.
-3. **Primeiro Provar, Depois Construir**:
-   - **Fase 1 (PoC no Windows)**: Provar o socket UDP, a deserialização binária dos pacotes reais do PS5 e a estabilização de frequência. *(Concluída com Sucesso)*.
-   - **Fase 2 (Web Dashboard Pro)**: Validar todos os sistemas integrados (ERS, Danos, Pneus, Voltas) em uma interface rica. *(Concluída com Sucesso)*.
-   - **Fase 3 (Mobile React Native / Android APK)**: Criar o aplicativo definitivo para smartphone/tablet deitado no cockpit, operando sem computador.
+Este documento consolida a especificação técnica completa, decisões arquiteturais, modelos matemáticos e detalhes de implementação do ecossistema de telemetria automotiva para **EA SPORTS™ F1® (F1 25 / F1 26)**.
 
 ---
 
-# PARTE 2 — Próximos Passos e Processo Futuro
+# Sumário
+1. [Visão Geral da Arquitetura](#1-visão-geral-da-arquitetura)
+2. [Protocolo de Telemetria F1 (Codemasters/EA Sports)](#2-protocolo-de-telemetria-f1-codemastersea-sports)
+3. [Pilar 1: Aplicativo Mobile (React Native + Kotlin Nativo)](#3-pilar-1-aplicativo-mobile-react-native--kotlin-nativo)
+4. [Pilar 2: Claudinho Ronaldo (Engenheiro de Corrida IA)](#4-pilar-2-claudinho-ronaldo-engenheiro-de-corrida-ia)
+5. [Pilar 3: Firmware e Hardware ESP32 (G7 Desk F1)](#5-pilar-3-firmware-e-hardware-esp32-g7-desk-f1)
+6. [Engenharia de Redes & Análise de Latência (L2/L3)](#6-engenharia-de-redes--análise-de-latência-l2l3)
 
-## 2.1 Visão Geral do Roadmap
+---
 
-```mermaid
-flowchart TD
-    A[Fase 1: PoC Windows Concluída] --> B[Fase 2: Web Dashboard Pro Concluído]
-    B --> C[Fase 3: Fixtures & Testes Automatizados Offline]
-    C --> D[Fase 4: Modelo de Domínio TelemetryState Unificado]
-    D --> E[Fase 5: Criação do App Mobile React Native + Expo]
-    E --> F[Fase 6: Integração UDP Nativa no Android]
-    F --> G[Fase 7: UI Nativa Otimizada para Celular Deitado]
-    G --> H[Fase 8: Geração do APK Final para Uso Pessoal]
+# 1. Visão Geral da Arquitetura
+
+O sistema opera com uma topologia local **Zero-Cloud**, onde todo o processamento de telemetria e controle de atuadores ocorre dentro da rede local (LAN).
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                REDE LOCAL (LAN)                                  │
+│                                                                                  │
+│  ┌──────────────────────┐          UDP Unicast          ┌─────────────────────┐  │
+│  │   PlayStation 5      │ ─────────────────────────────►│    Samsung A54      │  │
+│  │   F1 25 (60 Hz)      │      Porta 20777 (5 GHz)      │  React Native / KTL │  │
+│  │   192.168.1.109      │                               │    192.168.1.xxx    │  │
+│  └──────────────────────┘                               └──────────┬──────────┘  │
+│                                                                    │             │
+│                                                          UDP State │             │
+│                                                          Port 4210 │             │
+│                                                                    ▼             │
+│  ┌──────────────────────┐                               ┌─────────────────────┐  │
+│  │  Fitas LED Bancada   │◄─────── RMT Channels 0 & 1 ───│     ESP32 DevKit    │  │
+│  │  WS2805 24V RGBCCT   │         Pulsos de 800 kHz     │     FreeRTOS / C++  │  │
+│  │  + Fita Analógica 12V│                               │    192.168.1.103    │  │
+│  └──────────────────────┘                               └─────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2.2 Detalhamento das Próximas Fases
+# 2. Protocolo de Telemetria F1 (Codemasters/EA Sports)
 
-### Fase 3: Fixtures e Testes Automatizados Offline
-- **Gravação de Sessão Real**: Criar um utilitário simples no receptor para salvar 100–200 pacotes binários reais do PS5 em arquivos `.bin` (ex: `tests/fixtures/car-telemetry-2026.bin`, `lap-data-2026.bin`, `car-damage-2026.bin`).
-- **Suíte de Testes com Dados Reais**: Garantir que alterações no parser sejam testadas instantaneamente sem precisar ligar o console toda vez.
+O simulador F1 25 / F1 26 transmite pacotes binários compactados utilizando alinhamento de 1 byte (estruturas *packed*) em ordem de bytes **Little-Endian**.
 
-### Fase 4: Modelo de Domínio Unificado
-- Isolar completamente a camada de parsing de qualquer detalhe de transporte.
-- O objeto consolidado (`FullTelemetrySnapshot`) servirá como a única fonte de verdade para qualquer consumidor (seja o Web Dashboard via WebSocket ou o aplicativo React Native via estado nativo).
+### 2.1 Cabeçalho Universal de Pacotes (29 Bytes)
+Todos os pacotes recebidos na porta UDP `20777` compartilham o mesmo cabeçalho:
 
-### Fase 5: Aplicativo Mobile em React Native (Android)
-- **Stack Tecnológica**:
-  - React Native + TypeScript.
-  - Expo (com **Expo Prebuild / Development Build** para habilitar módulos nativos de rede C++/Java).
-  - Gerenciamento de Estado: **Zustand** (ultraleve e com renderizações atômicas sem re-renders desnecessários).
-  - Animações e Gráficos: **React Native Reanimated** ou **Shopify/Skia** para 60 FPS garantidos na thread de UI.
-
-### Fase 6: Módulo UDP Nativo no Android
-- O Android não possui o módulo `dgram` do Node.js nativamente.
-- Utilizaremos a biblioteca nativa `react-native-udp` (ou `react-native-sockets`) compilada no build de desenvolvimento do Expo.
-- O parser TypeScript já construído será importado diretamente para dentro do app mobile, pois foi escrito em TypeScript puro sem dependências pesadas de Node.js.
-
-### Fase 7: Dashboard Mobile Otimizado (Landscape / Celular Deitado)
-- Layout projetado para celular acoplado no volante ou suporte:
-  - Elementos de altíssimo contraste (visibilidade rápida com visão periférica).
-  - Cores térmicas e indicadores luminosos (Shift lights, DRS, Bandeiras FIA).
-  - Múltiplas telas selecionáveis por toque (Tela Principal de Corrida, Tela de Pneus & Freios, Tela de Danos e Engenharia).
-
-### Fase 8: Build e Instalação via APK
-- Geração do `.apk` de produção sem necessidade de publicação na Google Play Store.
-- Instalação direta no smartphone/tablet Android via cabo USB ou download local.
-
----
-
-# PARTE 3 — Descrição Técnica Detalhada dos Componentes
-
-## 3.1 O Protocolo UDP do F1 25 (Formato 2026)
-
-O jogo transmite dados binários compactados utilizando alinhamento de 1 byte (estruturas *packed*) e ordem de bytes **Little-Endian**.
-
-### Estrutura do Header Oficial (29 Bytes)
-Presente nos primeiros 29 bytes de **TODOS** os pacotes transmitidos pelo jogo:
-
-| Offset (Bytes) | Campo | Tipo | Descrição |
+| Offset | Tipo | Campo | Descrição |
 | :--- | :--- | :--- | :--- |
-| `0..1` | `m_packetFormat` | `uint16` | Ano do formato (ex: `2026` para F1 25 com pack 2026) |
-| `2` | `m_gameYear` | `uint8` | Dois últimos dígitos do ano (ex: `25`) |
-| `3` | `m_gameMajorVersion` | `uint8` | Versão Major (ex: `1`) |
-| `4` | `m_gameMinorVersion` | `uint8` | Versão Minor (ex: `12`) |
-| `5` | `m_packetVersion` | `uint8` | Versão do tipo de pacote (inicia em 1) |
-| `6` | `m_packetId` | `uint8` | ID do pacote (0 a 14) |
-| `7..14` | `m_sessionUID` | `uint64` | Identificador único global da sessão |
-| `15..18` | `m_sessionTime` | `float32` | Timestamp da sessão em segundos |
-| `19..22` | `m_frameIdentifier` | `uint32` | Contador do frame |
-| `23..26` | `m_overallFrameIdentifier` | `uint32` | Contador cumulativo (não reseta com flashback) |
-| `27` | `m_playerCarIndex` | `uint8` | **Índice do carro do jogador no grid (0 a 23)** |
-| `28` | `m_secondaryPlayerCarIndex` | `uint8` | Índice do segundo jogador (splitscreen) ou `255` |
+| `0` | `uint16` | `m_packetFormat` | Ano do formato (2025 ou 2026) |
+| `2` | `uint8` | `m_gameYear` | Ano do jogo (25) |
+| `3` | `uint8` | `m_gameMajorVersion` | Versão maior do jogo |
+| `4` | `uint8` | `m_gameMinorVersion` | Versão menor do jogo |
+| `5` | `uint8` | `m_packetVersion` | Versão do pacote |
+| `6` | `uint8` | `m_packetId` | Identificador do tipo de dados |
+| `7` | `uint64` | `m_sessionUID` | Identificador único da sessão |
+| `15` | `float` | `m_sessionTime` | Timestamp da sessão em segundos |
+| `19` | `uint32` | `m_frameIdentifier` | Número do quadro renderizado |
+| `23` | `uint32` | `m_overallFrameIdentifier` | Contador global de quadros |
+| `27` | `uint8` | `m_playerCarIndex` | Índice do carro do jogador (0..21) |
+| `28` | `uint8` | `m_secondaryPlayerCarIndex`| Índice do segundo jogador |
 
----
+### 2.2 Principais IDs de Pacotes Utilizados
 
-## 3.2 Arquitetura em Camadas e Pipeline de Dados
-
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        CAMADA DE TRANSPORTE UDP                        │
-│   UdpReceiver (dgram.Socket ouvindo na porta 20777 em 0.0.0.0)         │
-│   Taxa de ingestão: ~328 pacotes/segundo (sem descarte)                │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                      CAMADA DE PARSING BINÁRIO                         │
-│   ParserRegistry -> Roteamento por Packet ID (0..14)                   │
-│   ├── HeaderParser (29 bytes)                                          │
-│   ├── TelemetryParser (ID 6: 1448 bytes - 24 carros x 59b)            │
-│   ├── CarStatusParser (ID 7: ERS, Combustível, Pneus, DRS, Bandeiras)   │
-│   ├── CarDamageParser (ID 10: Asas, Assoalho, Câmbio, Motor, Desgaste) │
-│   └── LapDataParser (ID 2: Tempos de Volta, Setores, Posição)          │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                    CAMADA DE ESTADO (TELEMETRY STORE)                  │
-│   TelemetryStore (Singleton em memória)                                │
-│   - Atualização atômica in-place                                       │
-│   - Desacoplamento total de eventos de rede                            │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   CAMADA DE BROADCAST (SNAPSHOTS A 30 HZ)              │
-│   TelemetryWebServer (Timer fixo de ~33.3ms)                           │
-│   - Consolidação do estado                                             │
-│   - Envio de exatamente 30 mensagens/s via WebSocket                   │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     CAMADA DE APRESENTAÇÃO (UI WEB)                    │
-│   public/index.html (HTML5 / CSS3 / Vanilla JS)                        │
-│   - Elementos DOM cacheados uma única vez (Zero innerHTML)             │
-│   - Sample-and-Hold de texto a 10 Hz (leitura nítida de dígitos)       │
-│   - Atualização instantânea para marcha e bandeiras                    │
-│   - Shift Lights 15 LEDs + ERS Boost + Pneus 4 Rodas + Danos           │
-└────────────────────────────────────────────────────────────────────────┘
+```
+PacketId  0: Motion               (Física, aceleração G, pitch, roll, yaw)
+PacketId  1: Session              (Bandeiras FIA, clima, tempo restante, Safety Car)
+PacketId  2: LapData              (Tempos de volta, setores, posições, status de boxes)
+PacketId  3: Event                (Eventos instantâneos: batidas, ultrapassagens, voltas mais rápidas)
+PacketId  6: CarTelemetry         (Velocidade km/h, RPM, marcha, acelerador, freio, DRS, temp pneus)
+PacketId  7: CarStatus            (Combustível, ERS, Active Aero X-Mode/Z-Mode, danos de motor)
+PacketId 10: CarDamage            (Desgaste e danos estruturais de componentes percentuais)
+PacketId 16: Overtake             (Estado regulamentar do modo ultrapassagem F1 2026)
 ```
 
 ---
 
-## 3.3 Catálogo Detalhado de Arquivos e Funções
+# 3. Pilar 1: Aplicativo Mobile (React Native + Kotlin Nativo)
 
-### `src/models/` (Tipagem Estrita)
-* [`packet-ids.ts`](file:///c:/Projetos/F1%20Dash/src/models/packet-ids.ts): `enum PacketId` contendo todos os 15 identificadores oficiais (`Motion=0`, `Session=1`, `LapData=2`, `CarTelemetry=6`, `CarStatus=7`, `CarDamage=10`, etc.).
-* [`header.ts`](file:///c:/Projetos/F1%20Dash/src/models/header.ts): Interface TypeScript que mapeia o cabeçalho de 29 bytes.
-* [`car-telemetry.ts`](file:///c:/Projetos/F1%20Dash/src/models/car-telemetry.ts): Estrutura `CarTelemetryData` (Velocidade, RPM, Marcha, Acelerador, Freio, Direção, DRS, Temperaturas de Freio e Pneus).
-* [`car-status.ts`](file:///c:/Projetos/F1%20Dash/src/models/car-status.ts): Estrutura `CarStatusData` (Bateria ERS, Modo Boost/Overtake, Combustível em kg, Bandeiras da FIA, Composto Visual de Pneu).
-* [`car-damage.ts`](file:///c:/Projetos/F1%20Dash/src/models/car-damage.ts): Estrutura `CarDamageData` (Danos de Asa Dianteira L/R, Asa Traseira, Assoalho, Difusor, Câmbio, Desgaste do Motor ICE/MGU-K/MGU-H).
-* [`lap-data.ts`](file:///c:/Projetos/F1%20Dash/src/models/lap-data.ts): Estrutura `LapData` (Tempo da volta atual, última volta, Setor 1, Setor 2, Posição no grid `P1..P24`, Penalidades).
+### 3.1 Ingestão de Rede em Kotlin Nativo (`ExpoUdpModule.kt`)
+Em dispositivos Android, pontes puras de JavaScript para rede sofrem de *JNI Marshaling overhead* quando submetidas a rajadas de 180 a 360 pacotes/s.
+- Implementamos um módulo nativo em Kotlin que abre um `DatagramSocket` vinculado à porta local `20777`.
+- O pacote é recebido diretamente na memória nativa e entregue via evento de ponte otimizado para o `@f1-dash/telemetry-core`.
 
-### `src/utils/` (Operações de Baixo Nível)
-* [`buffer-reader.ts`](file:///c:/Projetos/F1%20Dash/src/utils/buffer-reader.ts): Wrapper de alta performance sobre o `Buffer` do Node.js com métodos de leitura Little-Endian (`readUInt8`, `readInt8`, `readUInt16LE`, `readInt16LE`, `readUInt32LE`, `readFloatLE`, `readBigUInt64LE`) e validação rigorosa de limites (*bounds checking*).
-* [`formatters.ts`](file:///c:/Projetos/F1%20Dash/src/utils/formatters.ts): Utilitários visuais para o console terminal (barras de progresso ANSI, cores de rotação e formatação de bytes).
+### 3.2 Parsing Binário com `DataView` (`packages/telemetry-core`)
+O normalizador utiliza `DataView` sobre um buffer compartilhado para extrair valores com precisão de byte sem gerar cópias de strings ou alocações temporárias no Garbage Collector:
+```typescript
+const view = new DataView(arrayBuffer);
+const packetFormat = view.getUint16(0, true);
+const packetId = view.getUint8(6);
+const playerIdx = view.getUint8(27);
+```
 
-### `src/parser/` (Decodificadores Binários)
-* [`header-parser.ts`](file:///c:/Projetos/F1%20Dash/src/parser/header-parser.ts): Decodifica os 29 bytes do cabeçalho e fornece o método ultrarrápido `peekPacketId(buffer)` para inspecionar o byte no offset 6 sem alocar memória extra.
-* [`telemetry-parser.ts`](file:///c:/Projetos/F1%20Dash/src/parser/telemetry-parser.ts): Decodifica o pacote ID 6 com suporte dual:
-  - **Formato 2026 (1448 bytes)**: 24 carros x 59 bytes cada (`m_engineTemperature` é `uint8`).
-  - **Formato 2024 (1352 bytes)**: 22 carros x 60 bytes cada (`m_engineTemperature` é `uint16`).
-* [`car-status-parser.ts`](file:///c:/Projetos/F1%20Dash/src/parser/car-status-parser.ts): Decodifica o pacote ID 7 (ERS, Combustível, Pneus, Flags).
-* [`car-damage-parser.ts`](file:///c:/Projetos/F1%20Dash/src/parser/car-damage-parser.ts): Decodifica o pacote ID 10 (Asas, Assoalho, Câmbio, Motor).
-* [`lap-data-parser.ts`](file:///c:/Projetos/F1%20Dash/src/parser/lap-data-parser.ts): Decodifica o pacote ID 2 (Tempos, Posição, Setores).
-* [`parser-registry.ts`](file:///c:/Projetos/F1%20Dash/src/parser/parser-registry.ts): Roteador central que distribui buffers para os parsers especializados.
+### 3.3 Suporte Multi-Regulamento: F1 2025 vs F1 2026
+- **F1 2025:** Mapeamento de `drs` (0 ou 1) e `ersDeployMode` (0 a 3).
+- **F1 2026 (Active Aero & Overtake Boost):**
+  - O regulamento de 2026 introduz a aerodinâmica ativa (*X-Mode* para retas de alta velocidade e *Z-Mode* para curvas de alta pressão aerodinâmica).
+  - O *Overtake Boost* em 2026 é desassociado do botão de ERS antigo: ele é regulado pelo delta de perseguição de menos de 1 segundo para o carro à frente. O normalizador monitora ambos os campos de forma isolada.
 
-### `src/state/` (Armazenamento de Estado)
-* [`telemetry-store.ts`](file:///c:/Projetos/F1%20Dash/src/state/telemetry-store.ts): Centraliza o objeto `FullTelemetrySnapshot`. Atualiza apenas os campos mutados conforme os pacotes chegam (sem dependência de timers ou disparo imediato de eventos).
-
-### `src/udp/` e `src/server/` (Comunicação de Rede)
-* [`receiver.ts`](file:///c:/Projetos/F1%20Dash/src/udp/receiver.ts): Socket UDP `dgram` com cálculo em tempo real de vazão de pacotes por segundo (`packetsPerSecond`), bytes/s e totalizadores.
-* [`web-server.ts`](file:///c:/Projetos/F1%20Dash/src/server/web-server.ts): Servidor HTTP nativo (porta 3000) e servidor WebSocket (`ws`). Contém o método `startSnapshotBroadcaster()` que dispara snapshots periódicos em **30 Hz fixos**.
-
-### `src/diagnostic.ts` (Ferramenta de Auditoria)
-* Script CLI especializado para auditoria de baixo nível. Exibe o IP de origem do transmissor, tamanho bruto em bytes, Session UID, e dumps hexadecimais do Header e do carro do jogador.
-
-### `public/index.html` (Interface do Cockpit Pro)
-* Painel visual completo sem frameworks pesados:
-  - **Shift Lights (15 LEDs)**: 5 Verdes, 5 Vermelhos e 5 Azuis com flash no limitador.
-  - **Cockpit Central**: Marcha gigante de alto contraste, Velocidade em km/h, RPM e Temperatura do Motor.
-  - **Badges de Alta Frequência**: DRS (`DRS PRONTO` / `DRS ATIVO`) e ERS (`⚡ BOOST / RETA`, `HOTLAP`, `MEDIUM`, `NONE`).
-  - **Pneus e Freios (4 Rodas)**: Composto (Soft, Medium, Hard, Inter, Wet), Idade em voltas, Desgaste %, Temperatura de Superfície e Pressão PSI.
-  - **Danos**: Asas dianteiras L/R, Asa traseira, Assoalho, Difusor, Câmbio e Motor.
-  - **Tempos & Corrida**: Posição na corrida (`P1..P24`), Tempo atual (mm:ss.ms), Última volta, Setor 1 e Setor 2, e Bandeiras FIA (Verde, Amarela, Vermelha, Azul).
+### 3.4 Motor Gráfico Reativo (60 FPS)
+- **Car Damage Heatmap:** Mapeamento dinâmico em vetor SVG. Os componentes do chassi (Asa Dianteira Esquerda/Direita, Assoalho, Sidepods, Difusor, Motor e Caixa de Câmbio) recebem classes de cores baseadas no percentual de dano:
+  - $0\%$: Verde Escuro (Estrutura íntegra)
+  - $1\% \dots 20\%$: Amarelo suave
+  - $21\% \dots 49\%$: Âmbar / Laranja
+  - $\ge 50\%$: Vermelho Alerta
+- **RevLights:** 15 LEDs estilizados divididos em Verde (5), Vermelho (5) e Roxo (5), acendendo progressivamente conforme o percentual de RPM da marcha atual, com flash estroboscópico de corte de giro (*Shift Flash*).
 
 ---
 
-## 3.4 Guia Rápido de Comandos
+# 4. Pilar 2: Claudinho Ronaldo (Engenheiro de Corrida IA)
 
-| Comando | Descrição |
-| :--- | :--- |
-| `npm run dev` | Inicia o receptor UDP (porta 20777) e o Web Dashboard (porta 3000) |
-| `npm run diag` | Executa o modo de diagnóstico de pacotes brutos RAW e IPs de origem |
-| `npm test` | Executa a suíte de testes unitários com validação dos formatos 2026 e 2024 |
-| `npm run build` | Compila o código TypeScript para a pasta `dist/` |
+### 4.1 Heurística de Detecção de Eventos (`race-engineer-detector.ts`)
+O listener avalia deltas e limites críticos a cada ciclo de telemetria:
+- **Degradação de Pneus:** $\Delta \text{desgaste} > 5\%$ em uma única volta ou desgaste absoluto $> 65\%$.
+- **Perda de Ritmo:** Queda de delta $> 1.5\text{s}$ no setor em relação à melhor volta pessoal.
+- **Entrada em Zona de Ataque:** Delta para o carro à frente menor que $1.0\text{s}$.
+- **Incidentes:** Danos súbitos em asas ou detecção de colisão via pacote de eventos.
+
+### 4.2 Máquina de Estados com Histerese e Cooldown
+Para evitar interrupções excessivas durante a pilotagem, o serviço aplica janelas de cooldown configuráveis por tipo de evento:
+- Alertas de danos graves: Cooldown de $45\text{s}$.
+- Informações de gap/ritmo: Cooldown de $120\text{s}$.
+- Alertas de bandeiras (Safety Car / Vermelha): Prioridade de interrupção instantânea (preempção da fila).
+
+### 4.3 Pipeline Acústico de Rádio F1 (DSP)
+Para reproduzir fielmente a acústica do rádio de equipe da Fórmula 1:
+1. **Chime de Abertura:** Disparo imediato do tom sonoro oficial de abertura de canal (`radio_beep.mp3`).
+2. **Equalização Passa-Banda (Bandpass 300 Hz – 3.000 Hz):** Filtro de telecomunicações que atenua graves profundos e agudos cristalinos, simulando o microfone do capacete.
+3. **Envelope Visual de Amplitude:** Cálculo do envelope de volume a cada $40\text{ms}$ para alimentar as barras animadas no banner de Team Radio da interface.
+
+---
+
+# 5. Pilar 3: Firmware e Hardware ESP32 (G7 Desk F1)
+
+### 5.1 Eletrônica de Potência e Distribuição
+- **Barramento 24V DC:** Alimenta as fitas digitais WS2805 RGBCCT de alta potência (60 pixels/m), garantindo baixa corrente e sem queda de tensão (*voltage drop*).
+- **Barramento 12V DC:** Alimenta fita analógica RGB via canais MOSFET acionados por PWM a 1 kHz.
+- **Slew-Rate Control:** Configuração de corrente de saída nos pinos de dados dos LEDs (`gpio_set_drive_capability` em `GPIO_DRIVE_CAP_1`) para suprimir reflexões de alta frequência nas linhas de transmissão.
+
+### 5.2 Controle RMT por Hardware (WS2805 RGBCCT)
+O circuito integrado WS2805 exige pacotes de 40 bits por pixel (8 bits R, 8 bits G, 8 bits B, 8 bits Warm White, 8 bits Cold White).
+- O firmware utiliza os módulos periféricos **RMT0 e RMT1** do ESP32 via biblioteca `NeoPixelBus`.
+- Os pulsos de sub-microssegundo são modulados diretamente por DMA de hardware sem consumir ciclos de instrução do processador.
+
+### 5.3 Smart Cross-Fade por Interpolação de Buffer
+Para eliminar cortes secos ao sair de modos esportivos (ex: Modo Reta para Branco Quente), o `EffectEngine` armazena um snapshot do quadro anterior e calcula cada canal físico com a curva *Smoothstep* cúbica:
+$$\text{progress} = \frac{now - start}{duration}$$
+$$t = \text{progress}^2 \cdot (3 - 2 \cdot \text{progress})$$
+$$\text{corFinal} = \text{ColorRGBCCT::lerp}(\text{snapshot}, \text{target}, t)$$
+
+| Transição | Duração | Comportamento Visual |
+| :--- | :--- | :--- |
+| **Saída para Iluminação Ambiente** | `380 ms` | Dissolve orgânico suave até o Branco Quente |
+| **Entrada em Modo Reta / Overtake** | `120 ms` | Resposta rápida e tátil de aceleração |
+| **Overtake ➔ Boxes** | `250 ms` | Fusão suave entre tons azuis e luzes de pit lane |
+| **Batida / Bandeira Vermelha** | `0 ms` | Corte imediato de impacto e emergência |
+
+### 5.4 Integração Alexa e Servidor Web Local
+- **Espalexa (SSDP/UPnP):** O ESP32 emula localmente lâmpadas Philips Hue na rede local, permitindo comandos diretos da Alexa ("Alexa, ligar iluminação da bancada") sem necessidade de skills na nuvem.
+- **Web Server HTTP (PROGMEM):** Interface de usuário com dark mode embarcada na memória flash para controle de brilho, testes de bancada e diagnóstico em tempo real.
+
+---
+
+# 6. Engenharia de Redes & Análise de Latência (L2/L3)
+
+### 6.1 A Descoberta da Tempestade de Broadcast L2
+Durante os testes de integração com o PS5 conectado via cabo Ethernet, identificou-se uma latência inesperada de 1 a 4 segundos na iluminação do ESP32.
+
+#### Mecânica do Problema
+1. O PS5 transmitia telemetria a 60 Hz utilizando endereço de broadcast (`192.168.1.255:20777`).
+2. O switch interno do roteador residencial é obrigado a replicar todo quadro com endereço MAC `FF:FF:FF:FF:FF:FF` para **todas as interfaces físicas**, incluindo o rádio Wi-Fi 2.4 GHz onde o ESP32 operava.
+3. Pela norma IEEE 802.11, quadros de Broadcast não podem usar modulações de alta velocidade (como MCS7 a 72 Mbps); eles são **obrigados a trafegar na taxa básica de 1 Mbps**.
+4. 180 pacotes/s de ~1.350 bytes geravam cerca de 2 Mbps de demanda bruta no ar a 1 Mbps, consumindo 100% do *airtime* da antena 2.4 GHz e lotando o buffer do rádio do ESP32.
+
+#### Prova Empírica Medida no ESP32 (`192.168.1.103`)
+
+| Cenário de Rede | Tráfego na Porta `20777` | Pacotes Entregues ao ESP32 | Latência Média | Perda de Pacotes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Repouso (Sem corrida)** | `0 pkts/s` | $3 / 3$ | **69,0 ms** | **0%** |
+| **UDP Broadcast (60 Hz)** | $180\text{ pkts/s}$ para `.255` | $1 / 4$ | **> 3.000 ms (Timeout)** | **75% de perda** |
+| **UDP Unicast (60 Hz)** | $180\text{ pkts/s}$ direto para o IP do A54 | $4 / 4$ | **62,2 ms** | **0%** |
+
+### 6.2 Solução Definitiva
+Configuração do jogo em **Unicast Estrito** apontando para o IP do smartphone na banda de 5 GHz. O tráfego pesado viaja exclusivamente pelo cabo $\to$ 5 GHz (a centenas de Mbps), deixando o espectro de 2.4 GHz 100% limpo e garantindo tempo real estrito para o ESP32.
