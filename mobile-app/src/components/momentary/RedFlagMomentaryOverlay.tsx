@@ -3,7 +3,7 @@ import { Animated, Dimensions, Easing, Pressable, StyleSheet, Text, View } from 
 import { LinearGradient } from 'expo-linear-gradient';
 import { CornerDownLeft, Flag, Gauge, OctagonX, ShieldAlert } from 'lucide-react-native';
 import { F1Font } from '../../theme/typography';
-import { HazardStripes, PulseRing, useLoop, useOverlayTransition } from './fx';
+import { HazardStripes, useLoop, useOverlayTransition } from './fx';
 
 interface RedFlagMomentaryOverlayProps {
   onDismiss: () => void;
@@ -81,38 +81,45 @@ export const RedFlagMomentaryOverlay: React.FC<RedFlagMomentaryOverlayProps> = (
           <Text style={styles.headerSub}>FIA MESSAGE</Text>
         </Animated.View>
 
-        {/* conteúdo central */}
+        {/* conteúdo central — Gráfico oficial F1 Broadcast Red Flag */}
         <View style={styles.center}>
-          <View style={styles.flagBlock}>
-            <View style={styles.rings}>
-              <PulseRing size={104} color={RED} periodMs={2000} />
-              <PulseRing size={104} color={RED} periodMs={2000} delayFraction={0.5} />
-            </View>
-            <Animated.View
-              style={{
-                opacity: flagOpacity,
-                transform: [{ scale: flagScale }, { translateY: flagLift }, { rotate: flagRotate }]
-              }}
-            >
-              <Flag size={72} color={RED} fill={RED} strokeWidth={1.8} />
-            </Animated.View>
-          </View>
-
-          <View style={styles.textBlock}>
-            <Animated.Text
-              style={[styles.title, { opacity: titleOpacity, transform: [{ scale: titleScale }] }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              RED FLAG
-            </Animated.Text>
-            <Animated.View style={{ opacity: subOpacity, transform: [{ translateY: subY }] }}>
-              <View style={styles.subRow}>
-                <View style={styles.subBar} />
-                <Text style={styles.subtitle}>SESSION SUSPENDED</Text>
+          <Animated.View
+            style={[
+              styles.broadcastCard,
+              {
+                opacity: titleOpacity,
+                transform: [{ scale: titleScale }]
+              }
+            ]}
+          >
+            {/* Faixa superior vermelha com linhas finas escuras no topo + "RED FLAG" */}
+            <View style={styles.broadcastTop}>
+              <View style={styles.broadcastTopLines}>
+                <View style={styles.broadcastThinLine} />
+                <View style={styles.broadcastThinLine} />
               </View>
+              <View style={styles.broadcastTitleRow}>
+                <Animated.View
+                  style={{
+                    opacity: flagOpacity,
+                    transform: [{ scale: flagScale }, { translateY: flagLift }, { rotate: flagRotate }]
+                  }}
+                >
+                  <Flag size={36} color="#ffffff" fill="#ffffff" strokeWidth={2} />
+                </Animated.View>
+                <Text style={styles.broadcastTitle} numberOfLines={1} adjustsFontSizeToFit>
+                  RED FLAG
+                </Text>
+              </View>
+            </View>
+
+            {/* Faixa inferior escura (#15151e) com "SESSION STOPPED" em vermelho */}
+            <Animated.View style={[styles.broadcastBottom, { opacity: subOpacity, transform: [{ translateY: subY }] }]}>
+              <Text style={styles.broadcastSubtitle} numberOfLines={1} adjustsFontSizeToFit>
+                SESSION STOPPED
+              </Text>
             </Animated.View>
-          </View>
+          </Animated.View>
         </View>
 
         {/* instruções */}
@@ -172,36 +179,70 @@ const styles = StyleSheet.create({
   headerSub: { color: '#fca5a5', fontFamily: F1Font.semi, fontSize: 11, letterSpacing: 2 },
   center: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 26,
+    paddingHorizontal: 32,
     paddingTop: 10
   },
-  flagBlock: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
-  rings: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  broadcastCard: {
+    width: '100%',
+    maxWidth: 520,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.16)',
+    shadowColor: '#e10600',
+    shadowOpacity: 0.55,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 16
+  },
+  broadcastTop: {
+    backgroundColor: '#e10600',
+    paddingTop: 6,
+    paddingBottom: 14,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  textBlock: { alignItems: 'flex-start' },
-  title: {
-    color: '#fff',
-    fontFamily: F1Font.boldItalic,
-    fontSize: 78,
-    lineHeight: 80,
-    letterSpacing: 2,
-    textShadowColor: 'rgba(239,68,68,0.75)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 22
+  broadcastTopLines: {
+    width: '100%',
+    gap: 3,
+    marginBottom: 8
   },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  subBar: { width: 38, height: 4, backgroundColor: RED, borderRadius: 2 },
-  subtitle: { color: '#fecaca', fontFamily: F1Font.bold, fontSize: 20, letterSpacing: 5 },
+  broadcastThinLine: {
+    width: '100%',
+    height: 2,
+    backgroundColor: 'rgba(21,21,30,0.45)'
+  },
+  broadcastTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14
+  },
+  broadcastTitle: {
+    color: '#ffffff',
+    fontFamily: F1Font.black,
+    fontSize: 58,
+    lineHeight: 62,
+    letterSpacing: 3
+  },
+  broadcastBottom: {
+    backgroundColor: '#15151e',
+    paddingVertical: 11,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 2,
+    borderTopColor: '#0b0b10'
+  },
+  broadcastSubtitle: {
+    color: '#e10600',
+    fontFamily: F1Font.bold,
+    fontSize: 22,
+    letterSpacing: 6.5
+  },
   chips: {
     flexDirection: 'row',
     justifyContent: 'center',

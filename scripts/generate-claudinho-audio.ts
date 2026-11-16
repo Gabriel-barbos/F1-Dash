@@ -74,7 +74,66 @@ const CLIPS_TO_GENERATE: ClipDef[] = [
 
   // START
   { id: 'start_1', scenario: 'START', text: 'Luzes apagadas, acelera essa porra! Pra cima deles, Gabriel!' },
-  { id: 'start_2', scenario: 'START', text: 'Bora Gabriel, largada perfeita! Traciona e fecha a porta na um!' }
+  { id: 'start_2', scenario: 'START', text: 'Bora Gabriel, largada perfeita! Traciona e fecha a porta na um!' },
+  { id: 'start_3', scenario: 'START', text: 'Sinal verde, pé embaixo! Cuidado com o pelotão na primeira curva!' },
+
+  // OVERTAKE (cenário frequente — inclui piadas do grid)
+  { id: 'overtake_4', scenario: 'OVERTAKE', text: 'Que ultrapassagem limpa, Gabriel! Deixou o Verstappen procurando a placa de freio!' },
+  { id: 'overtake_5', scenario: 'OVERTAKE', text: 'Passou por fora igual o Alonso em dia inspirado! Continua com essa pressão!' },
+  { id: 'overtake_6', scenario: 'OVERTAKE', text: 'Lindo mergulho, moleque! Nem o Leclerc na Ferrari errava uma dessas!' },
+  { id: 'overtake_7', scenario: 'OVERTAKE', text: 'Engoliu o cara na reta! Se fosse o Norris na largada já tinha perdido três!' },
+
+  // POSITION_LOST (cenário frequente)
+  { id: 'pos_lost_3', scenario: 'POSITION_LOST', text: 'Perdemos a posição, Gabriel. Calma, cola no vácuo que dá pra devolver na reta!' },
+  { id: 'pos_lost_4', scenario: 'POSITION_LOST', text: 'O cara passou, mas tá forçando muito o pneu. Fica na cola que ele vai desgastar!' },
+  { id: 'pos_lost_5', scenario: 'POSITION_LOST', text: 'Deixou a porta aberta, Gabriel! Bora recuperar essa posição já na próxima zona de DRS!' },
+
+  // GAP_BEHIND (cenário frequente)
+  { id: 'gap_behind_4', scenario: 'GAP_BEHIND', text: 'Olho no espelho, Gabriel! O cara tá chegando igual o Tsunoda no rádio!' },
+  { id: 'gap_behind_5', scenario: 'GAP_BEHIND', text: 'Diferença caindo atrás, protege o traçado interno na freada e traciona forte!' },
+
+  // GAP_UPDATE (cenário frequente)
+  { id: 'gap_front_4', scenario: 'GAP_UPDATE', text: 'Você tá tirando dois décimos por setor! Mais duas voltas e entra na zona de ataque!' },
+  { id: 'gap_front_5', scenario: 'GAP_UPDATE', text: 'O carro da frente tá patinando nas saídas, Gabriel! Pressiona que ele vai errar!' },
+
+  // LAP_PACE (cenário muito frequente)
+  { id: 'lap_pace_1', scenario: 'LAP_PACE', text: 'Bela volta, Gabriel! Mantém esse ritmo constante que o tempo tá excelente!' },
+  { id: 'lap_pace_2', scenario: 'LAP_PACE', text: 'Ritmo de relógio suíço, moleque! Até o Piastri ia ficar com inveja dessa frieza!' },
+  { id: 'lap_pace_3', scenario: 'LAP_PACE', text: 'Volta bem encaixada, Gabriel! Se continuar assim o Russell já vai reclamar no rádio!' },
+  { id: 'lap_pace_4', scenario: 'LAP_PACE', text: 'Tá andando forte demais! Continua nesse ritmo que a estratégia tá funcionando!' },
+
+  // CALM_RACE (cenário muito frequente — resenha, piadas gerais e piadas sobre pilotos do grid)
+  { id: 'calm_6', scenario: 'CALM_RACE', text: 'Pista limpa na sua frente, Gabriel. Foca no traçado e mantém essa pegada!' },
+  { id: 'calm_7', scenario: 'CALM_RACE', text: 'Tá tão tranquilo que dá tempo até da Ferrari pensar numa estratégia errada!' },
+  { id: 'calm_8', scenario: 'CALM_RACE', text: 'Tudo sob controle, Gabriel! Só não faz igual o Stroll e olha pro espelho antes de virar!' },
+  { id: 'calm_9', scenario: 'CALM_RACE', text: 'Ritmo bom, moleque! O Bortoleto tá mandando bem, mas hoje a pista é sua!' },
+  { id: 'calm_10', scenario: 'CALM_RACE', text: 'Se o Hamilton reclamar que o pneu acabou, lembra que ele ainda faz a volta mais rápida!' },
+  { id: 'calm_11', scenario: 'CALM_RACE', text: 'Tudo certo nos dados! Se o Sainz aparecer no espelho, já sabe que vem operação suave!' },
+  { id: 'calm_12', scenario: 'CALM_RACE', text: 'Carro redondo na mão, Gabriel! Até o engenheiro do Leclerc queria uma telemetria limpa assim!' },
+  { id: 'calm_13', scenario: 'CALM_RACE', text: 'Ninguém na frente e ninguém atrás. Só não relaxa igual treino de sexta-feira!' },
+  { id: 'calm_14', scenario: 'CALM_RACE', text: 'Temperatura perfeita, motor cantando fino! O Antonelli ia querer um carro estável desse jeito!' },
+
+  // DAMAGE
+  { id: 'damage_4', scenario: 'DAMAGE', text: 'Toque detectado, Gabriel! Testa a direção nas curvas rápidas e me diz se tá puxando!' },
+
+  // PIT_LANE
+  { id: 'pit_lane_3', scenario: 'PIT_LANE', text: 'Box confirmado, Gabriel! Olho na linha branca e pé leve no limitador!' },
+  { id: 'pit_lane_4', scenario: 'PIT_LANE', text: 'Entrando no pit lane! Pessoal tá pronto com o jogo novo, sem erro na parada!' },
+
+  // FASTEST_LAP
+  { id: 'fastest_lap_3', scenario: 'FASTEST_LAP', text: 'Volta mais rápida da corrida, Gabriel! O Verstappen acabou de chorar no rádio!' },
+
+  // TYRE_WEAR_WARNING & TYRE_TEMP_HIGH & BRAKE_TEMP_HIGH
+  { id: 'tyre_wear_warn_1', scenario: 'TYRE_WEAR_WARNING', text: 'Pneus passando de 45% de desgaste, Gabriel. Começa a administrar a borracha nas curvas!' },
+  { id: 'tyre_wear_warn_2', scenario: 'TYRE_WEAR_WARNING', text: 'Borracha começando a sentir o ritmo, Gabriel. Suaviza o volante nas curvas de alta!' },
+  { id: 'tyre_temp_1', scenario: 'TYRE_TEMP_HIGH', text: 'Temperatura dos pneus subindo, Gabriel! Não escorrega tanto na saída de curva!' },
+  { id: 'brake_temp_1', scenario: 'BRAKE_TEMP_HIGH', text: 'Temperatura dos freios no limite, Gabriel! Alivia um pouco a pressão na freada!' },
+
+  // FUEL & ERS
+  { id: 'fuel_low_1', scenario: 'FUEL_LOW', text: 'Combustível no limite negativo, Gabriel! Faz um pouco de lift and coast nessa volta!' },
+  { id: 'fuel_surplus_1', scenario: 'FUEL_SURPLUS', text: 'Margem de combustível tá boa, Gabriel! Pode acelerar forte e subir o ritmo!' },
+  { id: 'ers_full_1', scenario: 'ERS_FULL', text: 'Bateria cheia no volante, Gabriel! Aproveita a reta e usa o modo ultrapassagem!' },
+  { id: 'ers_low_1', scenario: 'ERS_LOW', text: 'Bateria no osso agora, Gabriel! Recarrega no miolo pra ter pressão na reta!' }
 ];
 
 async function fetchAudioBase64(text: string): Promise<string> {

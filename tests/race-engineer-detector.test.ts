@@ -5,7 +5,8 @@ import {
   INITIAL_COCKPIT_TELEMETRY_STATE,
   CockpitTelemetryState,
   SafetyCarStatus,
-  PitStatus
+  PitStatus,
+  SessionType
 } from '@f1-dash/telemetry-core';
 
 describe('RaceEngineerDetector — Automatic Event Detection', () => {
@@ -301,5 +302,89 @@ describe('RaceEngineerDetector — Automatic Event Detection', () => {
       (sc) => { triggeredScenario = sc; }
     );
     assert.strictEqual(triggeredScenario, 'ERS_FULL');
+  });
+
+  test('NÃO deve disparar FASTEST_LAP no início da corrida (volta 1->2 pessoal) nem quando outro piloto faz a volta mais rápida', () => {
+    const detector = new RaceEngineerDetector({ cooldownGlobalMs: 0 });
+    const triggered: string[] = [];
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 1, lastLapTimeInMS: 0, bestLapTimeInMS: 0, isPlayerFastestLap: false },
+      (sc) => triggered.push(sc)
+    );
+
+    // Volta 1->2 com melhor volta pessoal, mas SEM isPlayerFastestLap (não é a volta mais rápida da sessão)
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 2, lastLapTimeInMS: 91200, bestLapTimeInMS: 91200, isPlayerFastestLap: false },
+      (sc) => triggered.push(sc)
+    );
+
+    assert.ok(!triggered.includes('FASTEST_LAP'), `Não deveria disparar FASTEST_LAP, disparou: ${triggered.join(',')}`);
+  });
+
+  test('deve disparar FASTEST_LAP somente quando isPlayerFastestLap for true após a volta 1', () => {
+    const detector = new RaceEngineerDetector({ cooldownGlobalMs: 0 });
+    const triggered: string[] = [];
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 2, isPlayerFastestLap: false },
+      (sc) => triggered.push(sc)
+    );
+
+    detector.evaluate(
+      {
+        ...INITIAL_COCKPIT_TELEMETRY_STATE,
+        connected: true,
+        currentLapNum: 3,
+        lastLapTimeInMS: 83500,
+        bestLapTimeInMS: 83500,
+        isPlayerFastestLap: true,
+        sessionFastestLapMS: 83500
+      },
+      (sc) => triggered.push(sc)
+    );
+
+    assert.ok(triggered.includes('FASTEST_LAP'));
+  });
+
+  test('NÃO deve reclamar de POSITION_LOST durante parada nos boxes ou sob Safety Car', () => {
+    const detector = new RaceEngineerDetector({ cooldownGlobalMs: 0, cooldownPitMs: 999999 });
+    const triggered: string[] = [];
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 3, pitStatus: PitStatus.None },
+      (sc) => triggered.push(sc)
+    );
+
+    // Entrou nos boxes e caiu de P3 para P11
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 11, pitStatus: PitStatus.Pitting, pitLimiterActive: true },
+      (sc) => triggered.push(sc)
+    );
+
+    // Safety Car na pista e mudança de posição em Classificação
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, currentLapNum: 5, carPosition: 12, pitStatus: PitStatus.None, safetyCarStatus: SafetyCarStatus.Full },
+      (sc) => triggered.push(sc)
+    );
+
+    assert.ok(!triggered.includes('POSITION_LOST'), `Não deveria disparar POSITION_LOST nos boxes/SC, disparou: ${triggered.join(',')}`);
+  });
+
+  test('NÃO deve disparar POSITION_LOST ou OVERTAKE em sessão de Classificação', () => {
+    const detector = new RaceEngineerDetector({ cooldownGlobalMs: 0 });
+    const triggered: string[] = [];
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, sessionType: SessionType.Qualifying1, currentLapNum: 2, carPosition: 2 },
+      (sc) => triggered.push(sc)
+    );
+
+    detector.evaluate(
+      { ...INITIAL_COCKPIT_TELEMETRY_STATE, connected: true, sessionType: SessionType.Qualifying1, currentLapNum: 2, carPosition: 5 },
+      (sc) => triggered.push(sc)
+    );
+
+    assert.ok(!triggered.includes('POSITION_LOST'));
   });
 });

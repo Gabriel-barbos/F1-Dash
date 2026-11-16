@@ -5,3 +5,5 @@ node_modules
 esp32-fw/.pio/
 esp32-fw/.codegraph/
 esp32-fw/.vscode/
+.env
+.env.*

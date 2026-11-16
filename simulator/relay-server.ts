@@ -17,7 +17,7 @@ import { processRadioVoice } from '../mobile-app/src/services/radio-dsp';
 // ==========================================
 const UDP_PORT = Number(process.env.F1_UDP_PORT || 20777);
 const WS_PORT = Number(process.env.F1_WS_PORT || 20778);
-const GEMINI_API_KEY = 'AQ.Ab8RN6LgIEBTDjoOU0k7dj_BYMD9Slh6fjVUuZWpuS82HOCyyA';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 function getLocalIp(): string {
   const ifaces = os.networkInterfaces();
@@ -195,8 +195,15 @@ async function generateGeminiSpeech(scenario: string, text: string): Promise<str
   for (const model of models) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': GEMINI_API_KEY,
+          },
+          body,
+        }
       );
       if (res.ok) {
         const json = await res.json();

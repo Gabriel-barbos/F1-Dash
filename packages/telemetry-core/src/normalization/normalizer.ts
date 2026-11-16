@@ -15,6 +15,8 @@ export class RaceStateNormalizer {
   private lastHzCheck = Date.now();
   private prevSafetyCar = SafetyCarStatus.None;
   private prevRedFlag = false;
+  private playerCarIndex = 0;
+  private lastSessionUID = '';
 
   constructor(eventBus?: RaceEventBus) {
     this.state = JSON.parse(JSON.stringify(INITIAL_RACE_STATE));
@@ -52,10 +54,24 @@ export class RaceStateNormalizer {
 
     const header = 'data' in parsed ? (parsed.data as any).header : (parsed as any).header;
     if (header) {
+      const uid = header.sessionUID.toString();
+      if (this.lastSessionUID && uid !== this.lastSessionUID) {
+        // Nova sessão iniciada: limpa marcas de volta rápida/melhor volta da sessão anterior
+        this.state.timing.bestLapTimeMS = 0;
+        this.state.timing.lastLapTimeMS = 0;
+        this.state.timing.isPlayerFastestLap = false;
+        this.state.timing.sessionFastestLapMS = 0;
+        this.prevSafetyCar = SafetyCarStatus.None;
+        this.prevRedFlag = false;
+      }
+      this.lastSessionUID = uid;
+      if (typeof header.playerCarIndex === 'number') {
+        this.playerCarIndex = header.playerCarIndex;
+      }
       this.state.connection.gameYear = header.gameYear;
       this.state.connection.packetFormat = header.packetFormat;
       this.state.connection.frameIdentifier = header.frameIdentifier;
-      this.state.connection.sessionUID = header.sessionUID.toString();
+      this.state.connection.sessionUID = uid;
     }
 
     switch (parsed.type) {
@@ -137,6 +153,7 @@ export class RaceStateNormalizer {
         this.state.timing.safetyCarDelta = lap.safetyCarDelta;
         this.state.timing.lapInvalid = lap.currentLapInvalid;
         this.state.timing.penalties = lap.penalties;
+        this.state.timing.driverStatus = lap.driverStatus;
 
         this.state.pit.status = lap.pitStatus;
         this.state.pit.laneTimeMS = lap.pitLaneTimeInLaneInMS;
@@ -251,9 +268,16 @@ export class RaceStateNormalizer {
   private handleRawGameEvent(evt: any): void {
     const code = evt.eventStringCode;
     switch (code) {
-      case 'FTLP':
-        this.emitEvent('FASTEST_LAP', evt.eventDetails.details);
+      case 'FTLP': {
+        const details = evt.eventDetails.details || {};
+        const isPlayer = details.vehicleIdx === this.playerCarIndex;
+        this.state.timing.isPlayerFastestLap = isPlayer;
+        if (typeof details.lapTime === 'number' && details.lapTime > 0) {
+          this.state.timing.sessionFastestLapMS = Math.round(details.lapTime * 1000);
+        }
+        this.emitEvent('FASTEST_LAP', { ...details, isPlayer });
         break;
+      }
       case 'CHQF':
         this.emitEvent('CHEQUERED_FLAG', {});
         break;

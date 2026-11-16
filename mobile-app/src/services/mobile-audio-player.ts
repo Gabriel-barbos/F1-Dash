@@ -1,5 +1,42 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { processRadioVoice, RadioVoiceResult } from './radio-dsp';
+import { base64ToBytes, bytesToBase64, RadioVoiceResult } from './radio-dsp';
+
+/**
+ * Garante que o áudio Base64 vindo do Gemini TTS possua cabeçalho RIFF/WAVE (44 bytes).
+ * O Gemini TTS frequentemente retorna PCM16 mono 24kHz puro sem cabeçalho RIFF,
+ * o que faz o ExoPlayer/MediaPlayer no Android falhar silenciosamente ao tentar tocar `.wav`.
+ */
+function ensureWavHeaderBase64(b64: string, sampleRate = 24000): string {
+  // 'RIFF' em Base64 sempre começa com 'UklGR'
+  if (b64.startsWith('UklGR')) {
+    return b64;
+  }
+  const pcm = base64ToBytes(b64);
+  const dataSize = pcm.length;
+  const wav = new Uint8Array(44 + dataSize);
+  const view = new DataView(wav.buffer);
+
+  // 'RIFF'
+  view.setUint32(0, 0x52494646, false);
+  view.setUint32(4, 36 + dataSize, true);
+  // 'WAVE'
+  view.setUint32(8, 0x57415645, false);
+  // 'fmt '
+  view.setUint32(12, 0x666d7420, false);
+  view.setUint32(16, 16, true); // PCM chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // Byte rate
+  view.setUint16(32, 2, true); // Block align
+  view.setUint16(34, 16, true); // Bits per sample
+  // 'data'
+  view.setUint32(36, 0x64617461, false);
+  view.setUint32(40, dataSize, true);
+  wav.set(pcm, 44);
+
+  return bytesToBase64(wav);
+}
 
 let expoAudioModule: any = null;
 try {
@@ -25,17 +62,20 @@ export interface VoicePlaybackCallbacks {
 export class MobileAudioPlayer {
   private currentPlayer: any = null;
   private beepPlayer: any = null;
-  private audioModeReady = false;
+  private lastAudioModeAt = 0;
 
-  private async ensureAudioMode(): Promise<void> {
-    if (this.audioModeReady || !expoAudioModule) return;
+  private async ensureAudioMode(force = false): Promise<void> {
+    if (!expoAudioModule) return;
+    const now = Date.now();
+    // Revalida o AudioFocus a cada 2 minutos para evitar que notificações/corridas longas silenciem o canal
+    if (!force && now - this.lastAudioModeAt < 120000) return;
     try {
       await expoAudioModule.setAudioModeAsync?.({
         playsInSilentMode: true,
         interruptionMode: 'mixWithOthers'
       });
       await expoAudioModule.setIsAudioActiveAsync?.(true);
-      this.audioModeReady = true;
+      this.lastAudioModeAt = now;
     } catch (err) {
       console.warn('[MobileAudioPlayer] Falha ao configurar modo de áudio:', err);
     }
@@ -46,26 +86,36 @@ export class MobileAudioPlayer {
     if (!expoAudioModule?.createAudioPlayer) return;
     try {
       await this.ensureAudioMode();
+      if (this.beepPlayer) {
+        try {
+          this.beepPlayer.pause?.();
+          this.beepPlayer.remove?.();
+        } catch {}
+        this.beepPlayer = null;
+      }
       const player = expoAudioModule.createAudioPlayer(BEEP_ASSET);
       this.beepPlayer = player;
       return await new Promise<void>((resolve) => {
         let done = false;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
         const finish = () => {
           if (done) return;
           done = true;
+          if (timeoutId) clearTimeout(timeoutId);
           try {
             sub?.remove?.();
+            player.pause?.();
             player.remove?.();
           } catch {}
           if (this.beepPlayer === player) this.beepPlayer = null;
           resolve();
         };
         const sub = player.addListener?.('playbackStatusUpdate', (status: any) => {
-          if (status?.didJustFinish) finish();
+          if (status?.didJustFinish || status?.error) finish();
         });
         player.play();
         console.log('[MobileAudioPlayer] 📻 Bipe oficial do rádio F1 disparado');
-        setTimeout(finish, 1800);
+        timeoutId = setTimeout(finish, 1800);
       });
     } catch (err) {
       console.warn('[MobileAudioPlayer] Falha ao tocar bipe do rádio:', err);
@@ -81,11 +131,11 @@ export class MobileAudioPlayer {
     envelope: number[],
     durationMs: number,
     callbacks: VoicePlaybackCallbacks = {}
-  ): Promise<void> {
+  ): Promise<boolean> {
     this.stopVoice();
     if (!asset || !expoAudioModule?.createAudioPlayer) {
       console.warn('[MobileAudioPlayer] Asset de áudio indisponível.');
-      return;
+      return false;
     }
 
     try {
@@ -93,21 +143,30 @@ export class MobileAudioPlayer {
       const player = expoAudioModule.createAudioPlayer(asset);
       this.currentPlayer = player;
 
-      await new Promise<void>((resolve) => {
+      return await new Promise<boolean>((resolve) => {
         let finished = false;
-        const finish = () => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const finish = (ok: boolean) => {
           if (finished) return;
           finished = true;
+          if (timeoutId) clearTimeout(timeoutId);
           try {
             sub?.remove?.();
+            player.pause?.();
             player.remove?.();
           } catch {}
           if (this.currentPlayer === player) this.currentPlayer = null;
-          resolve();
+          resolve(ok);
         };
 
         const sub = player.addListener?.('playbackStatusUpdate', (status: any) => {
-          if (status?.didJustFinish) finish();
+          if (status?.error) {
+            console.warn('[MobileAudioPlayer] Erro no playback do asset:', status.error);
+            this.lastAudioModeAt = 0;
+            finish(false);
+          } else if (status?.didJustFinish) {
+            finish(true);
+          }
         });
 
         player.play();
@@ -117,16 +176,18 @@ export class MobileAudioPlayer {
           startedAt: Date.now()
         });
 
-        setTimeout(finish, durationMs + 1200);
+        timeoutId = setTimeout(() => finish(true), durationMs + 1200);
       });
     } catch (err) {
       console.error('[MobileAudioPlayer] Falha ao tocar asset:', err);
+      this.lastAudioModeAt = 0;
+      return false;
     }
   }
 
   /**
-   * Aplica o efeito de rádio (DSP em TS puro) no WAV do Gemini TTS e toca.
-   * Nunca cai em voz robótica: sem WAV, apenas não fala.
+   * Aplica o cabeçalho WAV (se PCM puro) e reproduz o áudio do Gemini TTS.
+   * Retorna false se houver falha para permitir fallback imediato ao clipe local.
    */
   public async playVoice(
     wavBase64?: string,
@@ -136,38 +197,36 @@ export class MobileAudioPlayer {
       durationMs?: number;
       dspAlreadyApplied?: boolean;
     }
-  ): Promise<void> {
+  ): Promise<boolean> {
     this.stopVoice();
     if (!wavBase64 || !expoAudioModule?.createAudioPlayer) {
       console.warn('[MobileAudioPlayer] Sem áudio da IA para tocar.');
-      return;
+      return false;
     }
 
     try {
       await this.ensureAudioMode();
 
+      const validWavBase64 = ensureWavHeaderBase64(wavBase64);
       let processed: RadioVoiceResult;
       if (options?.dspAlreadyApplied) {
         processed = {
-          wavBase64,
+          wavBase64: validWavBase64,
           envelope: options.envelope || [],
           durationMs: options.durationMs || (options.envelope?.length ? options.envelope.length * 40 : 3500),
           stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 }
         };
         console.log(`[MobileAudioPlayer] 🚀 DSP pré-processado no PC Relay (0ms de carga no Hermes, ${processed.durationMs}ms)`);
       } else {
-        // No celular nativo (100% no dispositivo, sem PC): toca o áudio dinâmico do Gemini
-        // diretamente via I/O nativo com envelope instantâneo (0ms de CPU), preservando 100% da
-        // taxa UDP (30 Hz estáveis) e evitando qualquer travamento no interpretador Hermes.
         const fastEnvelope = [0.15, 0.45, 0.85, 0.95, 0.7, 0.85, 0.9, 0.75, 0.5, 0.85, 0.95, 0.65, 0.4, 0.8, 0.9, 0.6, 0.35, 0.15];
-        const approxDuration = Math.max(2500, Math.min(8000, Math.round(((wavBase64.length * 0.75 - 44) / 48000) * 1000)));
+        const approxDuration = Math.max(2500, Math.min(8000, Math.round(((validWavBase64.length * 0.75 - 44) / 48000) * 1000)));
         processed = {
-          wavBase64,
+          wavBase64: validWavBase64,
           envelope: fastEnvelope,
           durationMs: approxDuration,
           stats: { rmsBefore: 0, rmsAfter: 0, peakAfter: 0 }
         };
-        console.log(`[MobileAudioPlayer] ⚡ Áudio dinâmico da IA reproduzido direto no celular com 0ms de carga no Hermes (${approxDuration}ms)`);
+        console.log(`[MobileAudioPlayer] ⚡ Áudio dinâmico da IA reproduzido direto no celular (${approxDuration}ms)`);
       }
 
       const fileUri = `${FileSystem.cacheDirectory}claudinho_radio_${Date.now()}.wav`;
@@ -178,22 +237,31 @@ export class MobileAudioPlayer {
       const player = expoAudioModule.createAudioPlayer(fileUri);
       this.currentPlayer = player;
 
-      await new Promise<void>((resolve) => {
+      return await new Promise<boolean>((resolve) => {
         let finished = false;
-        const finish = () => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const finish = (ok: boolean) => {
           if (finished) return;
           finished = true;
+          if (timeoutId) clearTimeout(timeoutId);
           try {
             sub?.remove?.();
+            player.pause?.();
             player.remove?.();
           } catch {}
           if (this.currentPlayer === player) this.currentPlayer = null;
           FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
-          resolve();
+          resolve(ok);
         };
 
         const sub = player.addListener?.('playbackStatusUpdate', (status: any) => {
-          if (status?.didJustFinish) finish();
+          if (status?.error) {
+            console.warn('[MobileAudioPlayer] Erro no playback da voz dinâmica:', status.error);
+            this.lastAudioModeAt = 0;
+            finish(false);
+          } else if (status?.didJustFinish) {
+            finish(true);
+          }
         });
 
         player.play();
@@ -203,10 +271,12 @@ export class MobileAudioPlayer {
           startedAt: Date.now()
         });
 
-        setTimeout(finish, processed.durationMs + 1500);
+        timeoutId = setTimeout(() => finish(true), processed.durationMs + 1500);
       });
     } catch (err) {
       console.error('[MobileAudioPlayer] Falha ao tocar voz:', err);
+      this.lastAudioModeAt = 0;
+      return false;
     }
   }
 

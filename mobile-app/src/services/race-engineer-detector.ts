@@ -1,7 +1,9 @@
 import {
   CockpitTelemetryState,
   SafetyCarStatus,
-  PitStatus
+  PitStatus,
+  DriverStatus,
+  SessionType
 } from '@f1-dash/telemetry-core';
 
 export interface DetectorOptions {
@@ -28,6 +30,11 @@ export class RaceEngineerDetector {
   private prevTyreWearThresholdNotified: Set<number> = new Set();
   private prevFuelLowNotified: boolean = false;
   private prevFuelSurplusNotified: boolean = false;
+  private prevSessionUID: string = '';
+  private prevSessionType: SessionType | undefined = undefined;
+  private lastPitExitTime: number = 0;
+  private prevPlayerFastestLap: boolean = false;
+  private prevSessionFastestLapMS: number = 0;
 
   private lastGlobalTriggerTime: number = 0;
   private lastTriggerByScenario: Map<string, number> = new Map();
@@ -62,6 +69,11 @@ export class RaceEngineerDetector {
     this.prevTyreWearThresholdNotified.clear();
     this.prevFuelLowNotified = false;
     this.prevFuelSurplusNotified = false;
+    this.prevSessionUID = '';
+    this.prevSessionType = undefined;
+    this.lastPitExitTime = 0;
+    this.prevPlayerFastestLap = false;
+    this.prevSessionFastestLapMS = 0;
     this.lastGlobalTriggerTime = 0;
     this.lastTriggerByScenario.clear();
     this.triggersInCurrentLap = 0;
@@ -96,9 +108,20 @@ export class RaceEngineerDetector {
 
     const curSpeed = state.speed ?? 0;
     const curLap = state.currentLapNum ?? 0;
+    const curSessionUID = state.sessionUID ?? '';
     const now = Date.now();
 
-    // Na primeira leitura de telemetria após conectar, apenas registra o estado base
+    // Detecta troca de sessão ou reinício de corrida (volta caiu de >1 para <=1) e reseta estado acumulado
+    const isSessionChanged =
+      (this.initialized && curSessionUID !== '' && this.prevSessionUID !== '' && curSessionUID !== this.prevSessionUID) ||
+      (this.initialized && state.sessionType !== undefined && this.prevSessionType !== undefined && state.sessionType !== this.prevSessionType) ||
+      (this.initialized && this.prevLapNum > 1 && curLap > 0 && curLap <= 1);
+
+    if (isSessionChanged) {
+      this.reset();
+    }
+
+    // Na primeira leitura de telemetria após conectar (ou após troca de sessão), apenas registra o estado base
     if (!this.initialized) {
       this.initialized = true;
       this.prevDamageSum = currentDamageSum;
@@ -111,7 +134,28 @@ export class RaceEngineerDetector {
       this.prevLapNum = curLap;
       this.prevBestLapTime = state.bestLapTimeInMS ?? 0;
       this.prevSpeed = curSpeed;
+      this.prevSessionUID = curSessionUID;
+      this.prevSessionType = state.sessionType;
+      this.prevPlayerFastestLap = !!state.isPlayerFastestLap;
+      this.prevSessionFastestLapMS = state.sessionFastestLapMS ?? 0;
       this.triggersInCurrentLap = 0;
+      return;
+    }
+
+    if (curSessionUID !== '') this.prevSessionUID = curSessionUID;
+    if (state.sessionType !== undefined) this.prevSessionType = state.sessionType;
+
+    // Se o piloto está na garagem (menu/box parado antes de ir pra pista), apenas sincroniza estado base
+    if (state.driverStatus === DriverStatus.InGarage) {
+      this.prevDamageSum = currentDamageSum;
+      this.prevMaxWingDamage = maxWingDamage;
+      if ((state.carPosition ?? 0) > 0) this.prevPosition = state.carPosition;
+      this.prevSafetyCar = state.safetyCarStatus ?? SafetyCarStatus.None;
+      this.prevRedFlag = !!state.isRedFlagActive;
+      this.prevPitStatus = state.pitStatus ?? PitStatus.None;
+      this.prevPitLimiter = !!state.pitLimiterActive;
+      if (curLap > 0) this.prevLapNum = curLap;
+      this.prevSpeed = curSpeed;
       return;
     }
 
@@ -206,11 +250,15 @@ export class RaceEngineerDetector {
     const isPitting =
       state.pitStatus === PitStatus.Pitting ||
       state.pitStatus === PitStatus.InPitArea ||
-      state.pitLimiterActive;
+      !!state.pitLimiterActive;
     const wasPitting =
       this.prevPitStatus === PitStatus.Pitting ||
       this.prevPitStatus === PitStatus.InPitArea ||
       this.prevPitLimiter;
+
+    if (wasPitting && !isPitting) {
+      this.lastPitExitTime = now;
+    }
 
     if (isPitting && !wasPitting) {
       if (canSpeakScenario('PIT_LANE', this.cooldownPitMs)) {
@@ -220,9 +268,27 @@ export class RaceEngineerDetector {
     this.prevPitStatus = state.pitStatus ?? PitStatus.None;
     this.prevPitLimiter = !!state.pitLimiterActive;
 
-    // 6. ULTRAPASSAGEM (Ganho de Posição)
+    const isRaceSession =
+      state.sessionType === undefined ||
+      state.sessionType === SessionType.Unknown ||
+      state.sessionType === SessionType.Race ||
+      state.sessionType === SessionType.Race2 ||
+      state.sessionType === SessionType.Race3;
+
+    const isStartGridShuffle =
+      curLap <= 1 && (state.currentLapTimeInMS ?? 0) > 0 && (state.currentLapTimeInMS ?? 0) < 5000;
+
+    const canJudgePositionChange =
+      isRaceSession &&
+      !isPitting &&
+      now - this.lastPitExitTime >= 8000 &&
+      (state.safetyCarStatus ?? SafetyCarStatus.None) === SafetyCarStatus.None &&
+      !state.isRedFlagActive &&
+      !isStartGridShuffle;
+
+    // 6. ULTRAPASSAGEM (Ganho de Posição) — apenas em corrida, na pista, fora dos boxes/SC/RedFlag
     const curPos = state.carPosition ?? 0;
-    if (this.prevPosition > 0 && curPos > 0) {
+    if (canJudgePositionChange && this.prevPosition > 0 && curPos > 0) {
       if (curPos < this.prevPosition) {
         // Ex: de P3 para P2 (ganhou posição)
         if (canSpeakScenario('OVERTAKE', this.cooldownOvertakeMs)) {
@@ -239,20 +305,24 @@ export class RaceEngineerDetector {
       this.prevPosition = curPos;
     }
 
-    // 7. VOLTA MAIS RÁPIDA (Roxo na tela)
+    // 7. VOLTA MAIS RÁPIDA DA SESSÃO (Roxo na tela — somente quando o evento oficial FTLP confirma que foi o jogador)
     const lastLapTime = state.lastLapTimeInMS ?? 0;
     const bestLapTime = state.bestLapTimeInMS ?? 0;
     const isNewLap = curLap > this.prevLapNum && this.prevLapNum > 0;
+    const curSessionFastestMS = state.sessionFastestLapMS ?? 0;
+    const playerJustSetFastestLap =
+      state.isPlayerFastestLap === true &&
+      (!this.prevPlayerFastestLap ||
+        (curSessionFastestMS > 0 && curSessionFastestMS !== this.prevSessionFastestLapMS));
 
-    if (
-      isNewLap &&
-      lastLapTime > 0 &&
-      bestLapTime > 0 &&
-      lastLapTime <= bestLapTime
-    ) {
+    if (curLap >= 2 && playerJustSetFastestLap) {
       if (canSpeakScenario('FASTEST_LAP', 30000)) {
         trigger('FASTEST_LAP', 30000);
       }
+    }
+    this.prevPlayerFastestLap = !!state.isPlayerFastestLap;
+    if (curSessionFastestMS > 0) {
+      this.prevSessionFastestLapMS = curSessionFastestMS;
     }
     if (curLap > 0) {
       this.prevLapNum = curLap;
@@ -261,9 +331,12 @@ export class RaceEngineerDetector {
       this.prevBestLapTime = bestLapTime;
     }
 
-    // 8. DESGASTE DE PNEUS (Alerta preventivo a 45% e Crítico a 70%)
+    // 8. DESGASTE DE PNEUS (Alerta preventivo a 45% e Crítico a 70%, reseta ao trocar pneus no box)
     if (state.tyresWear && state.tyresWear.length >= 4) {
       const maxWear = Math.max(...state.tyresWear);
+      if (maxWear < 10 && this.prevTyreWearThresholdNotified.size > 0) {
+        this.prevTyreWearThresholdNotified.clear();
+      }
       if (maxWear >= 70 && !this.prevTyreWearThresholdNotified.has(70)) {
         this.prevTyreWearThresholdNotified.add(70);
         if (canSpeakScenario('TYRE_WEAR', 45000)) {
@@ -329,25 +402,32 @@ export class RaceEngineerDetector {
     const gapFrontMS = state.deltaToCarInFrontInMS ?? 0;
     const gapBehindMS = state.deltaToCarBehindInMS ?? 0;
 
-    if (isNewLap) {
-      if (gapBehindMS > 0 && gapBehindMS <= 1500) {
+    if (isNewLap && !isPitting && curLap >= 2) {
+      if (canJudgePositionChange && gapBehindMS > 0 && gapBehindMS <= 1500) {
         if (canSpeakScenario('GAP_BEHIND', 35000)) {
           trigger('GAP_BEHIND', 35000);
         }
-      } else if (gapFrontMS > 0 && gapFrontMS <= 2500) {
+      } else if (canJudgePositionChange && gapFrontMS > 0 && gapFrontMS <= 2500) {
         if (canSpeakScenario('GAP_UPDATE', 35000)) {
           trigger('GAP_UPDATE', 35000);
         }
-      } else if (state.lastLapTimeInMS && state.lastLapTimeInMS > 0) {
+      } else if (lastLapTime > 0) {
         if (canSpeakScenario('LAP_PACE', 45000)) {
           trigger('LAP_PACE', 45000);
         }
       }
     }
 
-    // 10. MOMENTO ESTÁVEL / CALMARIA INFORMATIVA (ritmo de cruzeiro > 80km/h sem incidentes por 50s)
+    // 10. MOMENTO ESTÁVEL / CALMARIA INFORMATIVA (ritmo de cruzeiro > 80km/h na pista sem incidentes por 50s)
     const speed = state.speed ?? 0;
-    if (speed > 80 && now - this.lastGlobalTriggerTime >= 50000) {
+    if (
+      speed > 80 &&
+      !isPitting &&
+      !state.isRedFlagActive &&
+      (state.safetyCarStatus ?? SafetyCarStatus.None) !== SafetyCarStatus.FormationLap &&
+      curLap >= 1 &&
+      now - this.lastGlobalTriggerTime >= 50000
+    ) {
       if (canSpeakScenario('CALM_RACE', 50000)) {
         trigger('CALM_RACE', 50000);
       }

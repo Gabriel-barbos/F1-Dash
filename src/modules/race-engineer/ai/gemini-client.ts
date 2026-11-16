@@ -162,6 +162,10 @@ export class GeminiEngineerClient {
     return null;
   }
 
+  private pickRandom(items: string[]): string {
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
   /**
    * Respostas pré-calibradas do Claudinho Ronaldo caso a rede falhe ou a chave não esteja definida.
    */
@@ -173,7 +177,12 @@ export class GeminiEngineerClient {
       case 'POSITION_GAINED':
         return {
           shouldSpeak: true,
-          message: `CARALHO, QUE PASSADA! É disso que eu tô falando, ${driver}, porra!`,
+          message: this.pickRandom([
+            `CARALHO, QUE PASSADA! É disso que eu tô falando, ${driver}, porra!`,
+            `Que ultrapassagem limpa, ${driver}! Deixou o Verstappen procurando a placa de freio!`,
+            `Passou por fora igual o Alonso em dia inspirado! Continua pressionando!`,
+            `Engoliu o cara na reta! Se fosse o Norris na largada já tinha perdido três!`
+          ]),
           tone: 'celebratory',
           category: 'overtake',
           priority: 'HIGH'
@@ -181,7 +190,11 @@ export class GeminiEngineerClient {
       case 'POSITION_LOST':
         return {
           shouldSpeak: true,
-          message: `Perdeu a posição, ${driver}! Acorda pra vida e vai buscar essa merda!`,
+          message: this.pickRandom([
+            `Perdeu a posição, ${driver}! Acorda pra vida e vai buscar essa merda!`,
+            `Perdemos a posição, ${driver}. Calma, cola no vácuo que dá pra devolver na reta!`,
+            `Deixou a porta aberta, ${driver}! Bora recuperar já na próxima zona de DRS!`
+          ]),
           tone: 'urgent',
           category: 'gap',
           priority: 'HIGH'
@@ -189,7 +202,10 @@ export class GeminiEngineerClient {
       case 'SAFETY_CAR':
         return {
           shouldSpeak: true,
-          message: 'Safety Car na pista! Segura essa porra e respeita o delta positivo!',
+          message: this.pickRandom([
+            'Safety Car na pista! Segura essa porra e respeita o delta positivo!',
+            'Bandeira amarela, Safety Car! Respira, economiza pneu e foca no delta!'
+          ]),
           tone: 'urgent',
           category: 'safety_car',
           priority: 'CRITICAL'
@@ -197,7 +213,10 @@ export class GeminiEngineerClient {
       case 'VSC':
         return {
           shouldSpeak: true,
-          message: 'VSC acionado! Alivia o pé, olha o delta no volante, caralho!',
+          message: this.pickRandom([
+            'VSC acionado! Alivia o pé, olha o delta no volante, caralho!',
+            'Virtual Safety Car na pista! Mantém o delta positivo e não toma punição à toa!'
+          ]),
           tone: 'urgent',
           category: 'safety_car',
           priority: 'CRITICAL'
@@ -205,7 +224,10 @@ export class GeminiEngineerClient {
       case 'RED_FLAG':
         return {
           shouldSpeak: true,
-          message: 'Bandeira Vermelha! Para a palhaçada e traz essa carroça pros boxes.',
+          message: this.pickRandom([
+            'Bandeira Vermelha! Para a palhaçada e traz o carro pros boxes devagar!',
+            'Red flag na pista! Sessão suspensa, reduz o ritmo e entra no pit lane!'
+          ]),
           tone: 'urgent',
           category: 'safety_car',
           priority: 'CRITICAL'
@@ -213,7 +235,10 @@ export class GeminiEngineerClient {
       case 'CAR_DAMAGE':
         return {
           shouldSpeak: true,
-          message: `Puta que pariu, ${driver}! Quebrou a asa?! Que cagada foi essa, caralho?!`,
+          message: this.pickRandom([
+            `Puta que pariu, ${driver}! Quebrou a asa?! Que cagada foi essa, caralho?!`,
+            `Toque detectado, ${driver}! Testa a direção nas curvas rápidas e traz o carro inteiro!`
+          ]),
           tone: 'urgent',
           category: 'damage',
           priority: 'CRITICAL'
@@ -237,7 +262,10 @@ export class GeminiEngineerClient {
       case 'TYRE_WEAR_WARNING':
         return {
           shouldSpeak: true,
-          message: 'Pneus já tão na metade da vida. Para de fritar borracha à toa!',
+          message: this.pickRandom([
+            'Pneus já tão na metade da vida. Para de fritar borracha à toa!',
+            `Borracha começando a sentir o ritmo, ${driver}. Suaviza o volante nas curvas de alta!`
+          ]),
           tone: 'tactical',
           category: 'tyres',
           priority: 'STRATEGIC'
@@ -245,7 +273,10 @@ export class GeminiEngineerClient {
       case 'FASTEST_LAP':
         return {
           shouldSpeak: true,
-          message: 'Puta que pariu, melhor volta da corrida! Voou baixo agora, moleque!',
+          message: this.pickRandom([
+            'Puta que pariu, melhor volta da corrida! Voou baixo agora, moleque!',
+            `Volta mais rápida da corrida, ${driver}! O Verstappen acabou de chorar no rádio!`
+          ]),
           tone: 'celebratory',
           category: 'pace',
           priority: 'HIGH'
@@ -253,7 +284,14 @@ export class GeminiEngineerClient {
       case 'CALM_RACE':
         return {
           shouldSpeak: true,
-          message: `Pista limpa na sua frente, ${driver}. Mantém esse ritmo e cuida dos pneus.`,
+          message: this.pickRandom([
+            `Pista limpa na sua frente, ${driver}. Mantém esse ritmo e cuida dos pneus.`,
+            `Tá tão tranquilo que dá tempo até da Ferrari pensar numa estratégia errada!`,
+            `Tudo sob controle, ${driver}! Só não faz igual o Stroll e olha pro espelho antes de virar!`,
+            `Se o Hamilton reclamar que o pneu acabou, lembra que ele ainda faz a volta mais rápida!`,
+            `Ritmo bom, moleque! O Bortoleto tá mandando bem, mas hoje a pista é sua!`,
+            `Tudo certo nos dados! Se o Sainz aparecer no espelho, já sabe que vem operação suave!`
+          ]),
           tone: 'calm',
           category: 'pace',
           priority: 'INFORMATIONAL'
@@ -293,7 +331,11 @@ export class GeminiEngineerClient {
       case 'LAP_PACE':
         return {
           shouldSpeak: true,
-          message: `Bela volta, ${driver}! Mantém esse ritmo constante.`,
+          message: this.pickRandom([
+            `Bela volta, ${driver}! Mantém esse ritmo constante.`,
+            `Ritmo de relógio suíço, ${driver}! Até o Piastri ia ficar com inveja dessa frieza!`,
+            `Volta bem encaixada, ${driver}! Se continuar assim o Russell já vai reclamar no rádio!`
+          ]),
           tone: 'calm',
           category: 'pace',
           priority: 'INFORMATIONAL'

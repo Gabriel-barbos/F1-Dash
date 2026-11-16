@@ -335,6 +335,167 @@ export const CLAUDINHO_CLIPS: ClaudinhoClip[] = [
     durationMs: 6110,
     envelope: [0.125,0.053,0.054,0.053,0.207,0.385,0.447,0.438,0.652,0.961,0.929,0.826,0.095,0.129,0.117,0.133,0.063,0.065,0.542,0.819,0.704,0.857,0.984,0.327,0.095,0.344,0.494,0.412,0.068,0.833,0.233,0.159,0.877,0.191,0.18,0.615,0.844,0.979,0.82,0.924,0.593,0.64,0.506,0.083,0.152,0.11,0.075,0.058,0.249,0.233,0.075,0.288,0.214,0.448,0.12,0.671,0.076,0.063,0.648,0.536,0.698,0.148,0.447,0.284,0.278,0.088,0.787,0.178,0.134,0.059,0.055,0.053,0.056,0.04,0.056,0.136,0.007]
   },
+  // --- Expansão de frases pré-built + piadas gerais e dos pilotos do grid ---
+  {
+    id: "overtake_4",
+    scenario: "OVERTAKE",
+    text: "Que ultrapassagem limpa, Gabriel! Deixou o Verstappen procurando a placa de freio!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_1.wav"],
+    durationMs: 5270,
+    envelope: [0.09,0.35,0.75,0.9,0.6,0.4,0.8,0.95,0.5,0.2,0.1]
+  },
+  {
+    id: "overtake_5",
+    scenario: "OVERTAKE",
+    text: "Passou por fora igual o Alonso em dia inspirado! Continua com essa pressão!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_3.wav"],
+    durationMs: 5110,
+    envelope: [0.1,0.4,0.8,0.7,0.5,0.85,0.9,0.6,0.3,0.1]
+  },
+  {
+    id: "overtake_6",
+    scenario: "OVERTAKE",
+    text: "Lindo mergulho, moleque! Nem o Leclerc na Ferrari arriscava uma freada dessas!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_2.wav"],
+    durationMs: 6110,
+    envelope: [0.12,0.45,0.85,0.9,0.5,0.75,0.95,0.6,0.25,0.08]
+  },
+  {
+    id: "overtake_7",
+    scenario: "OVERTAKE",
+    text: "Engoliu o cara na reta! Se fosse o Norris na largada já tinha perdido três posições!",
+    asset: CLAUDINHO_AUDIO_ASSETS["overtake_1.wav"],
+    durationMs: 5270,
+    envelope: [0.1,0.5,0.85,0.7,0.4,0.8,0.9,0.55,0.2,0.05]
+  },
+  {
+    id: "pos_lost_3",
+    scenario: "POSITION_LOST",
+    text: "Perdemos a posição, Gabriel. Calma, cola no vácuo que dá pra devolver na reta!",
+    asset: CLAUDINHO_AUDIO_ASSETS["pos_lost_1.wav"],
+    durationMs: 4900,
+    envelope: [0.1,0.45,0.75,0.85,0.5,0.7,0.8,0.4,0.15]
+  },
+  {
+    id: "pos_lost_4",
+    scenario: "POSITION_LOST",
+    text: "O cara passou, mas tá forçando muito o pneu. Fica na cola que ele vai desgastar!",
+    asset: CLAUDINHO_AUDIO_ASSETS["pos_lost_2.wav"],
+    durationMs: 4200,
+    envelope: [0.12,0.5,0.8,0.65,0.4,0.75,0.6,0.2,0.08]
+  },
+  {
+    id: "gap_behind_4",
+    scenario: "GAP_BEHIND",
+    text: "Olho no espelho, Gabriel! O cara tá chegando bravo igual o Tsunoda no rádio!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_behind_2.wav"],
+    durationMs: 4600,
+    envelope: [0.1,0.4,0.8,0.85,0.5,0.7,0.85,0.45,0.1]
+  },
+  {
+    id: "gap_behind_5",
+    scenario: "GAP_BEHIND",
+    text: "Diferença caindo atrás, protege o traçado interno na freada e traciona forte!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_behind_3.wav"],
+    durationMs: 4800,
+    envelope: [0.1,0.5,0.75,0.85,0.6,0.8,0.5,0.2,0.08]
+  },
+  {
+    id: "gap_front_4",
+    scenario: "GAP_UPDATE",
+    text: "Você tá tirando dois décimos por setor! Mais duas voltas e entra na zona de ataque!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_3.wav"],
+    durationMs: 4800,
+    envelope: [0.1,0.45,0.8,0.9,0.5,0.75,0.85,0.4,0.1]
+  },
+  {
+    id: "gap_front_5",
+    scenario: "GAP_UPDATE",
+    text: "O carro da frente tá patinando nas saídas, Gabriel! Pressiona que ele vai errar!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_2.wav"],
+    durationMs: 4500,
+    envelope: [0.12,0.5,0.85,0.75,0.45,0.8,0.6,0.25,0.05]
+  },
+  {
+    id: "lap_pace_2",
+    scenario: "LAP_PACE",
+    text: "Ritmo de relógio suíço, moleque! Até o Piastri ia ficar com inveja dessa frieza!",
+    asset: CLAUDINHO_AUDIO_ASSETS["fastest_lap_2.wav"],
+    durationMs: 4200,
+    envelope: [0.1,0.4,0.8,0.9,0.6,0.75,0.5,0.2,0.05]
+  },
+  {
+    id: "lap_pace_3",
+    scenario: "LAP_PACE",
+    text: "Volta bem encaixada, Gabriel! Se continuar assim o Russell já vai reclamar no rádio!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_3.wav"],
+    durationMs: 4800,
+    envelope: [0.1,0.45,0.75,0.85,0.55,0.8,0.45,0.15]
+  },
+  {
+    id: "calm_joke_ferrari",
+    scenario: "CALM_RACE",
+    text: "Tá tão tranquilo que dá tempo até da Ferrari pensar numa estratégia errada!",
+    asset: CLAUDINHO_AUDIO_ASSETS["calm_1.wav"],
+    durationMs: 4900,
+    envelope: [0.1,0.4,0.75,0.85,0.5,0.7,0.8,0.45,0.1]
+  },
+  {
+    id: "calm_joke_stroll",
+    scenario: "CALM_RACE",
+    text: "Tudo sob controle, Gabriel! Só não faz igual o Stroll e olha pro espelho antes de virar!",
+    asset: CLAUDINHO_AUDIO_ASSETS["calm_1.wav"],
+    durationMs: 4900,
+    envelope: [0.12,0.45,0.8,0.7,0.4,0.75,0.85,0.4,0.1]
+  },
+  {
+    id: "calm_joke_bortoleto",
+    scenario: "CALM_RACE",
+    text: "Ritmo bom, moleque! O Bortoleto tá mandando bem, mas hoje a pista é sua!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_3.wav"],
+    durationMs: 4800,
+    envelope: [0.1,0.5,0.85,0.75,0.45,0.8,0.5,0.2,0.08]
+  },
+  {
+    id: "calm_joke_hamilton",
+    scenario: "CALM_RACE",
+    text: "Se o Hamilton reclamar que o pneu acabou, lembra que ele ainda faz a volta mais rápida!",
+    asset: CLAUDINHO_AUDIO_ASSETS["fastest_lap_2.wav"],
+    durationMs: 4200,
+    envelope: [0.1,0.45,0.8,0.9,0.55,0.75,0.4,0.15]
+  },
+  {
+    id: "calm_joke_sainz",
+    scenario: "CALM_RACE",
+    text: "Tudo certo nos dados! Se o Sainz aparecer no espelho, já sabe que vem operação suave!",
+    asset: CLAUDINHO_AUDIO_ASSETS["calm_1.wav"],
+    durationMs: 4900,
+    envelope: [0.1,0.4,0.7,0.85,0.6,0.75,0.45,0.15]
+  },
+  {
+    id: "calm_joke_antonelli",
+    scenario: "CALM_RACE",
+    text: "Temperatura perfeita, motor cantando fino! O Antonelli ia querer um carro estável desse jeito!",
+    asset: CLAUDINHO_AUDIO_ASSETS["gap_front_3.wav"],
+    durationMs: 4800,
+    envelope: [0.12,0.5,0.85,0.75,0.5,0.8,0.4,0.1]
+  },
+  {
+    id: "fastest_lap_3",
+    scenario: "FASTEST_LAP",
+    text: "Volta mais rápida da corrida, Gabriel! O Verstappen acabou de reclamar no rádio!",
+    asset: CLAUDINHO_AUDIO_ASSETS["fastest_lap_1.wav"],
+    durationMs: 5200,
+    envelope: [0.15,0.6,0.9,0.95,0.7,0.85,0.9,0.5,0.15]
+  },
+  {
+    id: "pit_lane_3",
+    scenario: "PIT_LANE",
+    text: "Box confirmado, Gabriel! Olho na linha branca e pé leve no limitador!",
+    asset: CLAUDINHO_AUDIO_ASSETS["pit_lane_2.wav"],
+    durationMs: 4300,
+    envelope: [0.1,0.5,0.8,0.7,0.45,0.75,0.6,0.2,0.08]
+  },
 ];
 
 const lastPlayedByScenario: Map<string, string> = new Map();

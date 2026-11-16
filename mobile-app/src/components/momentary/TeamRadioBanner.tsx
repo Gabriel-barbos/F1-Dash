@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { F1Font } from '../../theme/typography';
 import { PulseRing, useLoop } from './fx';
 
-const ENGINEER_PHOTO = require('../../../assets/claudinho2.jpeg');
+const ENGINEER_PHOTO = require('../../../assets/claudinho2.png');
 
 const TERRACOTTA = '#E05A36';
 const TERRACOTTA_DEEP = '#B84A28';

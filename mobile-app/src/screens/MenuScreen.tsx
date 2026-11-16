@@ -20,10 +20,11 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Lightbulb
+  Lightbulb,
+  Search
 } from 'lucide-react-native';
 import { telemetryService, ConnectionMode, MomentaryEventType } from '../services/telemetry-service';
-import { esp32LightingSender } from '../services/esp32-lighting-sender';
+import { esp32LightingSender, Esp32DiscoveryStatus } from '../services/esp32-lighting-sender';
 import { CockpitTelemetryState, INITIAL_COCKPIT_TELEMETRY_STATE } from '@f1-dash/telemetry-core';
 
 interface MenuScreenProps {
@@ -39,9 +40,30 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
   const [hostInput, setHostInput] = useState<string>(telemetryService.getServerHost());
   const [deviceIp, setDeviceIp] = useState<string>('Obtendo IP...');
   const [esp32IpInput, setEsp32IpInput] = useState<string>(esp32LightingSender.getTargetIp());
+  const [esp32Discovery, setEsp32Discovery] = useState<Esp32DiscoveryStatus>(esp32LightingSender.getDiscoveryStatus());
   const [esp32Testing, setEsp32Testing] = useState<boolean>(false);
   const [esp32TestResult, setEsp32TestResult] = useState<{ success: boolean; message: string } | null>(null);
   const isExpo = telemetryService.isExpoGo();
+
+  const isEsp32Discovering = esp32Discovery.status === 'DISCOVERING';
+
+  const handleDiscoverEsp32 = async () => {
+    setEsp32TestResult(null);
+    const foundIp = await esp32LightingSender.discoverLightingDevice({ force: true });
+    if (foundIp) {
+      setEsp32IpInput(foundIp);
+      const latest = esp32LightingSender.getDiscoveryStatus();
+      setEsp32TestResult({
+        success: true,
+        message: latest.message ?? `Dispositivo G7 Desk F1 encontrado em ${foundIp}.`
+      });
+    } else {
+      setEsp32TestResult({
+        success: false,
+        message: 'Nenhum dispositivo G7 Desk F1 encontrado na rede local. Informe o IP manualmente se necessário.'
+      });
+    }
+  };
 
   const handleTestEsp32 = async () => {
     setEsp32Testing(true);
@@ -51,6 +73,16 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
     setEsp32TestResult(res);
     setEsp32Testing(false);
   };
+
+  useEffect(() => {
+    const unsubDiscovery = esp32LightingSender.subscribe((status) => {
+      setEsp32Discovery(status);
+      if (status.status === 'CONNECTED' && status.ip) {
+        setEsp32IpInput(status.ip);
+      }
+    });
+    return unsubDiscovery;
+  }, []);
 
   useEffect(() => {
     Network.getIpAddressAsync()
@@ -248,15 +280,19 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
               <Lightbulb size={20} color="#f59e0b" strokeWidth={2.5} />
               <Text style={styles.esp32Title}>ILUMINAÇÃO G7 DESK F1 (ESP32)</Text>
             </View>
-            <View style={[styles.esp32Badge, esp32TestResult?.success ? styles.badgeSuccess : styles.badgeDefault]}>
+            <View style={[styles.esp32Badge, (esp32TestResult?.success || esp32Discovery.status === 'CONNECTED') ? styles.badgeSuccess : styles.badgeDefault]}>
               <Text style={styles.esp32BadgeText}>
-                {esp32TestResult?.success ? '🟢 CONECTADO' : 'PORTA 4210'}
+                {isEsp32Discovering
+                  ? '🔍 BUSCANDO...'
+                  : esp32TestResult?.success || esp32Discovery.status === 'CONNECTED'
+                  ? '🟢 CONECTADO'
+                  : 'PORTA 4210'}
               </Text>
             </View>
           </View>
 
           <Text style={styles.esp32Subtitle}>
-            Envia efeitos de corrida (DRS, Overtake, Chuva, Batida) direto para as fitas LED na mesa.
+            Descoberta automática via mDNS/rede local (ou IP manual avançado). Envia telemetria UDP na porta 4210.
           </Text>
 
           <View style={styles.inputActionRow}>
@@ -266,16 +302,27 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
                 setEsp32IpInput(text);
                 esp32LightingSender.setTargetIp(text);
               }}
-              placeholder="IP do ESP32 (Padrão: 192.168.1.103)"
+              placeholder="IP manual (preenchido automaticamente)"
               placeholderTextColor="#64748b"
               style={styles.ipInput}
               autoCapitalize="none"
               autoCorrect={false}
             />
             <TouchableOpacity
-              style={[styles.connectBtn, esp32Testing && { opacity: 0.6 }]}
+              style={[styles.discoverBtn, isEsp32Discovering && { opacity: 0.6 }]}
+              onPress={handleDiscoverEsp32}
+              disabled={isEsp32Discovering || esp32Testing}
+              activeOpacity={0.8}
+            >
+              <Search size={14} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.connectBtnText}>
+                {isEsp32Discovering ? 'BUSCANDO...' : 'BUSCAR DISPOSITIVO'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.connectBtn, (esp32Testing || isEsp32Discovering) && { opacity: 0.6 }]}
               onPress={handleTestEsp32}
-              disabled={esp32Testing}
+              disabled={esp32Testing || isEsp32Discovering}
               activeOpacity={0.8}
             >
               <RefreshCw size={14} color="#fff" strokeWidth={2.5} />
@@ -285,10 +332,38 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
             </TouchableOpacity>
           </View>
 
-          {esp32TestResult && (
-            <View style={[styles.testResultBox, esp32TestResult.success ? styles.testResultSuccess : styles.testResultError]}>
-              <Text style={[styles.testResultText, { color: esp32TestResult.success ? '#22c55e' : '#f87171' }]}>
-                {esp32TestResult.message}
+          {(esp32TestResult || esp32Discovery.message) && (
+            <View
+              style={[
+                styles.testResultBox,
+                esp32TestResult
+                  ? esp32TestResult.success
+                    ? styles.testResultSuccess
+                    : styles.testResultError
+                  : esp32Discovery.status === 'CONNECTED'
+                  ? styles.testResultSuccess
+                  : esp32Discovery.status === 'DISCOVERING'
+                  ? styles.testResultInfo
+                  : styles.testResultError
+              ]}
+            >
+              <Text
+                style={[
+                  styles.testResultText,
+                  {
+                    color: esp32TestResult
+                      ? esp32TestResult.success
+                        ? '#22c55e'
+                        : '#f87171'
+                      : esp32Discovery.status === 'CONNECTED'
+                      ? '#22c55e'
+                      : esp32Discovery.status === 'DISCOVERING'
+                      ? '#38bdf8'
+                      : '#f87171'
+                  }
+                ]}
+              >
+                {esp32TestResult ? esp32TestResult.message : esp32Discovery.message}
               </Text>
             </View>
           )}
@@ -317,6 +392,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onLaunchCockpit }) => {
             if (connMode === 'MOCK') {
               telemetryService.forceStateScenario('NORMAL');
             }
+            void esp32LightingSender.ensureConnectedOnSessionStart();
             onLaunchCockpit();
           }}
           activeOpacity={0.85}
@@ -553,6 +629,15 @@ const styles = StyleSheet.create({
   connectBtnActive: {
     backgroundColor: '#059669'
   },
+  discoverBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#7c3aed',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 6
+  },
   connectBtnText: {
     color: '#ffffff',
     fontSize: 12,
@@ -619,6 +704,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)'
+  },
+  testResultInfo: {
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)'
   },
   testResultText: {
     fontSize: 11,

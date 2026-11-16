@@ -646,8 +646,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 6,
-    marginVertical: 2,
+    marginTop: -4,
+    marginBottom: 6,
     gap: 6,
+    zIndex: 20,
+    elevation: 10,
   },
   scenarioLabel: {
     color: '#38bdf8',
@@ -671,7 +674,8 @@ const styles = StyleSheet.create({
   dashboardBody: {
     flex: 1,
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    zIndex: 1,
   },
   columnsContainer: {
     flex: 1,

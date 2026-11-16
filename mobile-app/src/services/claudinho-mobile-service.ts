@@ -1,6 +1,13 @@
-import { CockpitTelemetryState } from '@f1-dash/telemetry-core';
+import {
+  CockpitTelemetryState,
+  PitStatus,
+  SafetyCarStatus,
+  SessionType,
+  VisualTyreCompound,
+  Weather
+} from '@f1-dash/telemetry-core';
 import { mobileAudioPlayer } from './mobile-audio-player';
-import { getClaudinhoClip, ClaudinhoClip } from './claudinho-clips';
+import { getClaudinhoClip } from './claudinho-clips';
 
 const API_KEY = 'AQ.Ab8RN6LgIEBTDjoOU0k7dj_BYMD9Slh6fjVUuZWpuS82HOCyyA';
 
@@ -8,14 +15,16 @@ const CLAUDINHO_SYSTEM_PROMPT = `
 Você é o "Claudinho Ronaldo", engenheiro de corrida brasileiro de Fórmula 1 e parceiro de equipe de confiança do piloto Gabriel.
 
 DIRETRIZES DA SUA FALA NO RÁDIO:
-1. FOCO TÉCNICO E INFORMATIVO: Dê sempre informações úteis, concretas e acionáveis baseadas nos dados reais da telemetria enviados (desgaste dos pneus, temperatura, combustível, ritmo de volta, gaps de DRS e tráfego).
-2. USO EQUILIBRADO DE PALAVRÕES (NÃO FORCE):
-   - Palavrões ("porra", "caralho", "merda", "puta que pariu") devem ser usados COM PARCIMÔNIA, EXCLUSIVAMENTE em momentos de impacto real ou alta adrenalina: batida forte, dano grave, susto violento, bandeira vermelha ou ultrapassagem no limite.
-   - Em situações normais, calmas ou informativas (pneus, combustível, ritmo, gaps, boxes de rotina), NÃO use palavrões forçados. Seja firme, técnico, motivador e parceiro, usando gírias automobilísticas naturais do Brasil ("boa moleque", "olho no espelho", "administra a borracha", "traciona forte", "ritmo constante", "tempo roxo").
-3. PROIBIDO REPETIR BORDÕES:
-   - NUNCA use frases clichês repetitivas como "lata velha", "passeio de domingo" ou similares. Seja sempre variado e baseado nos dados do momento.
-4. FORMATO:
-   - Resposta curta de rádio: entre 8 e 14 palavras (máximo 4 a 5 segundos de fala).
+1. FOCO TÉCNICO E CONTEXTO REAL: Dê informações úteis, concretas e coerentes com o momento da corrida (tipo de sessão, boxes, safety car, clima, desgaste dos pneus, temperatura, combustível, ritmo de volta, gaps e punições). NUNCA diga que o piloto fez volta mais rápida se ele não detém a volta mais rápida da sessão, e NUNCA reclame de perda de posição se ele estiver nos boxes.
+2. PERSONALIDADE, RESENHA E PIADAS DO GRID:
+   - Em momentos calmos (CALM_RACE, LAP_PACE) ou de comemoração/ultrapassagem, você pode ocasionalmente soltar piadas rápidas de automobilismo ou zoar pilotos do grid da F1 (Verstappen, Hamilton, Leclerc, Norris, Piastri, Alonso, Sainz, Russell, Stroll, Tsunoda, Bortoleto, etc.), mantendo o ritmo de rádio curto.
+3. USO EQUILIBRADO DE PALAVRÕES (NÃO FORCE):
+   - Palavrões ("porra", "caralho", "merda", "puta que pariu") devem ser usados COM PARCIMÔNIA, EXCLUSIVAMENTE em momentos de impacto real ou alta adrenalina: batida forte, dano grave, bandeira vermelha ou ultrapassagem no limite.
+   - Em situações normais, calmas ou informativas, seja firme, técnico, motivador e bem-humorado.
+4. PROIBIDO REPETIR BORDÕES:
+   - NUNCA use frases clichês repetitivas como "lata velha", "passeio de domingo" ou similares.
+5. FORMATO:
+   - Resposta curta de rádio: entre 8 e 16 palavras (máximo 4 a 5 segundos de fala).
    - Responda APENAS com o texto da fala no rádio, sem aspas, sem asteriscos, sem emojis e sem explicações.
 `;
 
@@ -65,13 +74,70 @@ export class ClaudinhoMobileService {
     const fuelLaps = telemetry.fuelRemainingLaps !== undefined ? `${telemetry.fuelRemainingLaps >= 0 ? '+' : ''}${telemetry.fuelRemainingLaps.toFixed(1)} voltas` : undefined;
     const ersPct = telemetry.ersPercentage !== undefined ? `${Math.round(telemetry.ersPercentage)}%` : undefined;
 
+    const sessionLabel =
+      telemetry.sessionType === SessionType.Qualifying1 ||
+      telemetry.sessionType === SessionType.Qualifying2 ||
+      telemetry.sessionType === SessionType.Qualifying3 ||
+      telemetry.sessionType === SessionType.ShortQualifying ||
+      telemetry.sessionType === SessionType.OneShotQualifying
+        ? 'Classificação'
+        : telemetry.sessionType === SessionType.Practice1 ||
+            telemetry.sessionType === SessionType.Practice2 ||
+            telemetry.sessionType === SessionType.Practice3 ||
+            telemetry.sessionType === SessionType.ShortPractice
+          ? 'Treino Livre'
+          : telemetry.sessionType === SessionType.TimeTrial
+            ? 'Time Trial'
+            : 'Corrida';
+
+    const isPitting =
+      telemetry.pitStatus === PitStatus.Pitting ||
+      telemetry.pitStatus === PitStatus.InPitArea ||
+      !!telemetry.pitLimiterActive;
+
+    const scLabel = telemetry.isRedFlagActive
+      ? 'BANDEIRA VERMELHA'
+      : telemetry.safetyCarStatus === SafetyCarStatus.Full
+        ? 'Safety Car na pista'
+        : telemetry.safetyCarStatus === SafetyCarStatus.Virtual
+          ? 'Virtual Safety Car (VSC)'
+          : telemetry.safetyCarStatus === SafetyCarStatus.FormationLap
+            ? 'Volta de apresentação'
+            : 'Pista livre (bandeira verde)';
+
+    const weatherLabel =
+      telemetry.weather === Weather.Storm || telemetry.weather === Weather.HeavyRain
+        ? 'Chuva forte'
+        : telemetry.weather === Weather.LightRain
+          ? 'Chuva leve'
+          : telemetry.weather === Weather.Overcast
+            ? 'Nublado'
+            : 'Seco';
+
+    const compoundLabel =
+      telemetry.visualTyreCompound === VisualTyreCompound.F1_Soft
+        ? 'Macio'
+        : telemetry.visualTyreCompound === VisualTyreCompound.F1_Medium
+          ? 'Médio'
+          : telemetry.visualTyreCompound === VisualTyreCompound.F1_Hard
+            ? 'Duro'
+            : telemetry.visualTyreCompound === VisualTyreCompound.F1_Inter
+              ? 'Intermediário'
+              : telemetry.visualTyreCompound === VisualTyreCompound.F1_Wet
+                ? 'Chuva Extrema'
+                : undefined;
+
     const parts: string[] = [
       `Evento detectado: ${eventScenario}`,
+      `Sessão: ${sessionLabel} | Status: ${scLabel} | Clima: ${weatherLabel}`,
       `Piloto: ${driverName}`,
       `Posição: P${telemetry.carPosition || 1} (Volta ${telemetry.currentLapNum || 1}${telemetry.totalLaps ? `/${telemetry.totalLaps}` : ''})`
     ];
 
+    if (isPitting) parts.push(`Nos boxes / Pit Lane (paradas: ${telemetry.numPitStops ?? 0})`);
+    if (compoundLabel) parts.push(`Pneu: ${compoundLabel} (${telemetry.tyresAgeLaps ?? 0} voltas de uso)`);
     if (lastLap) parts.push(`Última volta: ${lastLap} (Melhor pessoal: ${bestLap || lastLap})`);
+    if (telemetry.isPlayerFastestLap) parts.push(`Dono da volta mais rápida da sessão até agora`);
     if (gapFront) parts.push(`Gap pro carro da frente: ${gapFront}`);
     if (gapBehind) parts.push(`Gap pro carro de trás: ${gapBehind}`);
     if (tyreWear !== undefined) parts.push(`Desgaste máx dos pneus: ${tyreWear}%`);
@@ -79,8 +145,13 @@ export class ClaudinhoMobileService {
     if (brakeTemp !== undefined) parts.push(`Temp freios: ${brakeTemp}°C`);
     if (fuelLaps) parts.push(`Combustível restante: ${fuelLaps}`);
     if (ersPct) parts.push(`Bateria ERS: ${ersPct}`);
+    if (telemetry.penalties && telemetry.penalties > 0) parts.push(`Punições acumuladas: ${telemetry.penalties}s`);
+    const wingDmg = Math.max(telemetry.frontLeftWingDamage ?? 0, telemetry.frontRightWingDamage ?? 0);
+    if (wingDmg > 0 || (telemetry.floorDamage ?? 0) > 0) {
+      parts.push(`Danos: asa dianteira ${wingDmg}%, assoalho ${telemetry.floorDamage ?? 0}%`);
+    }
 
-    return `DADOS DA CORRIDA:\n${parts.join('\n')}\n\nInstrução: Dê uma instrução útil e direta ao piloto usando os dados acima. Se for uma situação de corrida normal/calma, informe sobre pneus, combustível, ritmo ou gaps. Seja parceiro e técnico. Palavrão SOMENTE se for batida ou perigo iminente. Nunca use frases clichês como "lata velha".`;
+    return `DADOS DA CORRIDA:\n${parts.join('\n')}\n\nInstrução: Dê uma instrução útil e direta ao piloto usando os dados acima. Respeite o contexto da sessão e pista. Em momentos calmos (CALM_RACE, LAP_PACE), pode mandar uma resenha rápida ou piada leve sobre pilotos do grid da F1. Palavrão SOMENTE se for batida, bandeira vermelha ou perigo iminente.`;
   }
 
   /**
@@ -291,10 +362,12 @@ export class ClaudinhoMobileService {
           finalMessage = generatedText;
           callbacks.onStart?.(generatedText);
           await mobileAudioPlayer.playRadioBeep();
-          await mobileAudioPlayer.playVoice(dynamicWavBase64, { onPlaybackStart: callbacks.onVoiceStart });
-          playedDynamic = true;
+          playedDynamic = await mobileAudioPlayer.playVoice(dynamicWavBase64, {
+            onPlaybackStart: callbacks.onVoiceStart
+          });
         } catch (playErr) {
           console.warn('[ClaudinhoMobile] Falha ao tocar voz dinâmica, usando clipe local:', playErr);
+          playedDynamic = false;
         }
       }
 
@@ -305,12 +378,15 @@ export class ClaudinhoMobileService {
         finalMessage = clip.text;
         callbacks.onStart?.(clip.text);
         await mobileAudioPlayer.playRadioBeep();
-        await mobileAudioPlayer.playAsset(
+        const assetOk = await mobileAudioPlayer.playAsset(
           clip.asset,
           clip.envelope,
           clip.durationMs,
           { onPlaybackStart: callbacks.onVoiceStart }
         );
+        if (!assetOk) {
+          await mobileAudioPlayer.playSpeechFallback(finalMessage, { onPlaybackStart: callbacks.onVoiceStart });
+        }
       }
 
       return { message: finalMessage, tone: 'celebratory', priority: 'HIGH', category: eventScenario };

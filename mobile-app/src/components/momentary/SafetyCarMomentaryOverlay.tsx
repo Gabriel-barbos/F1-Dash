@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Ellipse, Line, Text as SvgText } from 'react-native-svg';
 import { Ban, Gauge, ShieldAlert, Siren, Timer } from 'lucide-react-native';
 import { SafetyCarStatus } from '@f1-dash/telemetry-core';
 import { F1Font } from '../../theme/typography';
-import { HazardStripes, PulseRing, useLoop, useOverlayTransition } from './fx';
+import { HazardStripes, useLoop, useOverlayTransition } from './fx';
 
 interface SafetyCarMomentaryOverlayProps {
   onDismiss: () => void;
@@ -14,7 +15,6 @@ interface SafetyCarMomentaryOverlayProps {
 }
 
 const AMBER = '#facc15';
-const AMBER_DEEP = '#a16207';
 const DURATION_MS = 7500;
 const DELTA_RANGE = 1.5; // segundos representados em cada lado da barra
 const DELTA_TRACK = 240;
@@ -29,7 +29,6 @@ export const SafetyCarMomentaryOverlay: React.FC<SafetyCarMomentaryOverlayProps>
   const { enter, countdown, close } = useOverlayTransition(DURATION_MS, onDismiss);
   const { width } = Dimensions.get('window');
 
-  const beam = useLoop(1500); // rotação do giroflex
   const glow = useLoop(750, Easing.inOut(Easing.quad), true);
   const sweep = useLoop(3000, Easing.inOut(Easing.quad));
 
@@ -59,7 +58,6 @@ export const SafetyCarMomentaryOverlay: React.FC<SafetyCarMomentaryOverlayProps>
     enter.interpolate({ inputRange: [0.55 + i * 0.1, 0.75 + i * 0.1], outputRange: [24, 0], extrapolate: 'clamp' });
   const footerOpacity = enter.interpolate({ inputRange: [0.6, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
 
-  const beamRotate = beam.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.85] });
   const sweepX = sweep.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.4, width * 1.1] });
 
@@ -110,41 +108,41 @@ export const SafetyCarMomentaryOverlay: React.FC<SafetyCarMomentaryOverlayProps>
         </Animated.View>
 
         <View style={styles.center}>
-          {/* Giroflex */}
-          <View style={styles.sirenBlock}>
-            <View style={styles.rings}>
-              <PulseRing size={104} color={AMBER} periodMs={1700} />
-              <PulseRing size={104} color={AMBER} periodMs={1700} delayFraction={0.5} />
-            </View>
-            <Animated.View style={[styles.beam, { transform: [{ rotate: beamRotate }] }]}>
-              <LinearGradient
-                colors={['rgba(250,204,21,0.0)', 'rgba(250,204,21,0.75)']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.beamGradient}
-              />
-            </Animated.View>
-            <Animated.View style={{ opacity: iconOpacity, transform: [{ scale: iconScale }] }}>
-              <View style={styles.sirenDisc}>
-                <Siren size={52} color="#1a1300" strokeWidth={2.4} />
-              </View>
-            </Animated.View>
-          </View>
+          {/* Gráfico oficial F1 Broadcast: Barra amarela FIA SAFETY CAR */}
+          <Animated.View style={[styles.broadcastWrap, { opacity: titleOpacity, transform: [{ translateX: titleX }] }]}>
+            <View style={styles.broadcastLeftEdge} />
+            <View style={styles.broadcastBar}>
+              {/* Emblema FIA */}
+              <Animated.View style={[styles.fiaBadge, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}>
+                <Svg width={56} height={40} viewBox="0 0 64 44">
+                  <Ellipse cx="27" cy="22" rx="22" ry="17" stroke="#0b0b0e" strokeWidth="2.4" fill="none" />
+                  <Ellipse cx="37" cy="22" rx="22" ry="17" stroke="#0b0b0e" strokeWidth="2.4" fill="none" />
+                  <Line x1="10" y1="14" x2="54" y2="14" stroke="#0b0b0e" strokeWidth="1.2" opacity={0.45} />
+                  <Line x1="10" y1="30" x2="54" y2="30" stroke="#0b0b0e" strokeWidth="1.2" opacity={0.45} />
+                  <SvgText
+                    x="32"
+                    y="27"
+                    fill="#0b0b0e"
+                    fontSize="16"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    letterSpacing="0.5"
+                  >
+                    FiA
+                  </SvgText>
+                </Svg>
+              </Animated.View>
 
-          {/* Título */}
-          <Animated.View style={[styles.titleBlock, { opacity: titleOpacity, transform: [{ translateX: titleX }] }]}>
-            <View style={styles.codeRow}>
-              <View style={styles.codeBadge}>
-                <Text style={styles.codeText}>{isVSC ? 'VSC' : 'SC'}</Text>
+              <View style={styles.broadcastTextCol}>
+                <Text style={styles.broadcastTitle} numberOfLines={1} adjustsFontSizeToFit>
+                  {isVSC ? 'VIRTUAL SAFETY CAR' : 'SAFETY CAR'}
+                </Text>
               </View>
-              <Text style={styles.kicker}>{isVSC ? 'VIRTUAL' : 'CAR ON TRACK'}</Text>
             </View>
-            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
-              {isVSC ? 'VIRTUAL SAFETY CAR' : 'SAFETY CAR'}
-            </Text>
-            <View style={styles.subRow}>
-              <View style={styles.subBar} />
-              <Text style={styles.subtitle}>REDUCE PACE · NO OVERTAKING</Text>
+            <View style={styles.broadcastSubBar}>
+              <Text style={styles.broadcastSubText}>
+                {isVSC ? 'VSC DEPLOYED · REDUCE PACE · NO OVERTAKING' : 'CAR ON TRACK · REDUCE PACE · NO OVERTAKING'}
+              </Text>
             </View>
           </Animated.View>
 
@@ -199,42 +197,64 @@ const styles = StyleSheet.create({
   headerDivider: { width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.3)' },
   headerSub: { color: '#fde68a', fontFamily: F1Font.semi, fontSize: 11, letterSpacing: 2 },
   center: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22, paddingTop: 10, paddingHorizontal: 24 },
-  sirenBlock: { width: 118, height: 118, alignItems: 'center', justifyContent: 'center' },
-  rings: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  beam: { position: 'absolute', width: 118, height: 118, alignItems: 'flex-end', justifyContent: 'center' },
-  beamGradient: { width: 59, height: 12, borderRadius: 6 },
-  sirenDisc: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    backgroundColor: AMBER,
+  broadcastWrap: {
+    flexShrink: 1,
+    maxWidth: 470,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(247,209,23,0.45)',
+    shadowColor: '#f7d117',
+    shadowOpacity: 0.45,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 14
+  },
+  broadcastLeftEdge: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+    backgroundColor: '#0b0b0e',
+    zIndex: 2
+  },
+  broadcastBar: {
+    backgroundColor: '#f7d117',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: AMBER_DEEP,
-    shadowColor: AMBER,
-    shadowOpacity: 0.9,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 }
+    paddingVertical: 14,
+    paddingLeft: 18,
+    paddingRight: 22,
+    gap: 14
   },
-  titleBlock: { flexShrink: 1, alignItems: 'flex-start' },
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  codeBadge: { backgroundColor: AMBER, paddingHorizontal: 10, paddingVertical: 2, borderRadius: 3 },
-  codeText: { color: '#1a1300', fontFamily: F1Font.black, fontSize: 18, letterSpacing: 2 },
-  kicker: { color: '#fde68a', fontFamily: F1Font.bold, fontSize: 12, letterSpacing: 4 },
-  title: {
-    color: '#fff',
-    fontFamily: F1Font.boldItalic,
-    fontSize: 52,
-    lineHeight: 56,
-    letterSpacing: 1.2,
-    textShadowColor: 'rgba(250,204,21,0.65)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20
+  fiaBadge: {
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  subBar: { width: 34, height: 4, backgroundColor: AMBER, borderRadius: 2 },
-  subtitle: { color: '#fef3c7', fontFamily: F1Font.bold, fontSize: 13, letterSpacing: 3 },
+  broadcastTextCol: {
+    flexShrink: 1,
+    justifyContent: 'center'
+  },
+  broadcastTitle: {
+    color: '#0b0b0e',
+    fontFamily: F1Font.black,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: 1.5
+  },
+  broadcastSubBar: {
+    backgroundColor: '#15151e',
+    paddingVertical: 7,
+    paddingLeft: 18,
+    paddingRight: 16
+  },
+  broadcastSubText: {
+    color: '#f7d117',
+    fontFamily: F1Font.bold,
+    fontSize: 11,
+    letterSpacing: 2.5
+  },
   panel: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -95,6 +95,9 @@ export interface RaceState {
     safetyCarDelta: number;
     lapInvalid: boolean;
     penalties: number;
+    driverStatus: DriverStatus;
+    isPlayerFastestLap: boolean;
+    sessionFastestLapMS: number;
   };
   pit: {
     status: PitStatus;
@@ -216,7 +219,10 @@ export const INITIAL_RACE_STATE: RaceState = {
     deltaToRaceLeaderMS: 0,
     safetyCarDelta: 0,
     lapInvalid: false,
-    penalties: 0
+    penalties: 0,
+    driverStatus: DriverStatus.OnTrack,
+    isPlayerFastestLap: false,
+    sessionFastestLapMS: 0
   },
   pit: {
     status: PitStatus.None,
@@ -325,6 +331,9 @@ export interface CockpitTelemetryState {
   sessionType: SessionType;
   sessionTimeLeft: number;
   pitSpeedLimit: number;
+  sessionUID?: string;
+  isPlayerFastestLap?: boolean;
+  sessionFastestLapMS?: number;
 
   tyresWear: FourWheelsTuple<number>;
   tyresDamage: FourWheelsTuple<number>;
@@ -408,7 +417,10 @@ export function toCockpitTelemetryState(state: RaceState): CockpitTelemetryState
     safetyCarDelta: state.timing.safetyCarDelta,
     currentLapInvalid: state.timing.lapInvalid,
     penalties: state.timing.penalties,
-    driverStatus: DriverStatus.OnTrack,
+    driverStatus: state.timing.driverStatus ?? DriverStatus.OnTrack,
+    isPlayerFastestLap: state.timing.isPlayerFastestLap,
+    sessionFastestLapMS: state.timing.sessionFastestLapMS,
+    sessionUID: state.connection.sessionUID,
 
     pitStatus: state.pit.status,
     pitLaneTimerActive: state.pit.laneTimeMS > 0,

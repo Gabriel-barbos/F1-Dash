@@ -65,6 +65,7 @@ class TelemetryService {
   private storeUnsub: (() => void) | null = null;
   private lastUiUpdate: number = 0;
   private lastDetectorEval: number = 0;
+  private wasTelemetryConnected: boolean = false;
 
   constructor() {
     const store = TelemetryStore.getInstance();
@@ -142,6 +143,11 @@ class TelemetryService {
   }
 
   private notify() {
+    if (this.currentState.connected && !this.wasTelemetryConnected) {
+      void esp32LightingSender.ensureConnectedOnSessionStart();
+    }
+    this.wasTelemetryConnected = this.currentState.connected;
+
     if (this.currentState.connected) {
       esp32LightingSender.updateFromTelemetry(this.currentState);
     }

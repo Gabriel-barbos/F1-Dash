@@ -1,9 +1,19 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Network from 'expo-network';
 import {
   CockpitTelemetryState,
   SafetyCarStatus,
   PitStatus,
   Weather
 } from '@f1-dash/telemetry-core';
+import {
+  CACHE_HEALTH_TIMEOUT_MS,
+  DiscoveryMethod,
+  ESP32_UDP_PORT,
+  discoverLightingDeviceWithDetails,
+  isValidIpv4,
+  probeJsonInfo
+} from './esp32-discovery';
 
 export type AmbientLightingMode = 'DAY' | 'NIGHT' | 'WAITING';
 export type WeatherLightingMode = 'CLEAR' | 'CLOUDY' | 'RAIN' | 'STORM';
@@ -32,11 +42,37 @@ export interface Esp32RaceStatePayload {
 }
 
 const DEFAULT_ESP32_IP = '192.168.1.103';
-const DEFAULT_ESP32_UDP_PORT = 4210;
+const DEFAULT_ESP32_UDP_PORT = ESP32_UDP_PORT;
+const CACHE_STORAGE_KEY = 'f1_dash_esp32_lighting_cache';
+const DISCOVERY_FAILURE_COOLDOWN_MS = 15000;
+
+export type Esp32ConnectionStatus = 'IDLE' | 'DISCOVERING' | 'CONNECTED' | 'NOT_FOUND';
+
+export interface Esp32DiscoveryStatus {
+  status: Esp32ConnectionStatus;
+  ip: string;
+  port: number;
+  method: DiscoveryMethod | null;
+  message: string | null;
+  lastAttemptTime: number;
+}
 
 class Esp32LightingSender {
   private esp32Ip: string = DEFAULT_ESP32_IP;
   private esp32Port: number = DEFAULT_ESP32_UDP_PORT;
+  private cachedIp: string | null = null;
+  private cacheLoaded: boolean = false;
+  private discoveryPromise: Promise<string | null> | null = null;
+  private lastDiscoveryFailureTime: number = 0;
+  private statusListeners: Set<(status: Esp32DiscoveryStatus) => void> = new Set();
+  private discoveryStatus: Esp32DiscoveryStatus = {
+    status: 'IDLE',
+    ip: DEFAULT_ESP32_IP,
+    port: DEFAULT_ESP32_UDP_PORT,
+    method: null,
+    message: null,
+    lastAttemptTime: 0
+  };
   private expoSocket: any = null;
   private rnSocket: any = null;
   private initializingSocket: boolean = false;
@@ -69,12 +105,246 @@ class Esp32LightingSender {
   constructor() {
     this.initUdpSockets();
     this.startContinuousHeartbeat();
+    void this.bootstrapDiscovery();
+  }
+
+  private getCacheFileUri(): string | null {
+    try {
+      if (FileSystem.documentDirectory) {
+        return `${FileSystem.documentDirectory}esp32-lighting-cache.json`;
+      }
+    } catch {}
+    return null;
+  }
+
+  private async loadCachedIp(): Promise<string | null> {
+    if (this.cacheLoaded) {
+      return this.cachedIp;
+    }
+
+    try {
+      const fileUri = this.getCacheFileUri();
+      if (fileUri) {
+        const info = await FileSystem.getInfoAsync(fileUri);
+        if (info.exists) {
+          const raw = await FileSystem.readAsStringAsync(fileUri);
+          const parsed = JSON.parse(raw);
+          if (isValidIpv4(parsed?.ip)) {
+            this.cachedIp = parsed.ip.trim();
+            if (typeof parsed?.port === 'number') {
+              this.esp32Port = parsed.port;
+            }
+          }
+        }
+      } else if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (isValidIpv4(parsed?.ip)) {
+            this.cachedIp = parsed.ip.trim();
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ESP32 Sender] Falha ao ler cache do IP:', err);
+    }
+
+    this.cacheLoaded = true;
+    return this.cachedIp;
+  }
+
+  private async saveCachedIp(ip: string, port: number = DEFAULT_ESP32_UDP_PORT): Promise<void> {
+    if (!isValidIpv4(ip)) return;
+    const cleanIp = ip.trim();
+    this.cachedIp = cleanIp;
+    this.cacheLoaded = true;
+
+    const payload = JSON.stringify({ ip: cleanIp, port, updatedAt: Date.now() });
+
+    try {
+      const fileUri = this.getCacheFileUri();
+      if (fileUri) {
+        await FileSystem.writeAsStringAsync(fileUri, payload);
+      } else if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(CACHE_STORAGE_KEY, payload);
+      }
+    } catch (err) {
+      console.warn('[ESP32 Sender] Falha ao salvar cache do IP:', err);
+    }
+  }
+
+  private async getDeviceLocalIpv4(): Promise<string | null> {
+    try {
+      const ip = await Network.getIpAddressAsync();
+      return isValidIpv4(ip) ? ip.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private notifyStatusListeners() {
+    const snapshot = this.getDiscoveryStatus();
+    for (const listener of this.statusListeners) {
+      try {
+        listener(snapshot);
+      } catch {}
+    }
+  }
+
+  public subscribe(listener: (status: Esp32DiscoveryStatus) => void): () => void {
+    this.statusListeners.add(listener);
+    listener(this.getDiscoveryStatus());
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
+  public getDiscoveryStatus(): Esp32DiscoveryStatus {
+    return { ...this.discoveryStatus };
+  }
+
+  private async bootstrapDiscovery(): Promise<void> {
+    const cached = await this.loadCachedIp();
+    if (cached) {
+      this.esp32Ip = cached;
+      this.discoveryStatus = {
+        ...this.discoveryStatus,
+        ip: cached,
+        port: this.esp32Port
+      };
+      this.notifyStatusListeners();
+    }
+    await this.discoverLightingDevice();
+  }
+
+  /**
+   * Descobre automaticamente o IP do controlador G7 Desk F1 na rede local:
+   * 1. Cache (400 ms) -> 2. mDNS g7-desk-lighting.local (800 ms) -> 3. Varredura paralela da sub-rede.
+   */
+  public async discoverLightingDevice(options?: { force?: boolean }): Promise<string | null> {
+    if (this.discoveryPromise) {
+      return this.discoveryPromise;
+    }
+
+    if (
+      !options?.force &&
+      this.lastDiscoveryFailureTime > 0 &&
+      Date.now() - this.lastDiscoveryFailureTime < DISCOVERY_FAILURE_COOLDOWN_MS
+    ) {
+      return null;
+    }
+
+    this.discoveryPromise = (async () => {
+      this.discoveryStatus = {
+        ...this.discoveryStatus,
+        status: 'DISCOVERING',
+        message: 'Buscando G7 Desk F1 na rede local...',
+        lastAttemptTime: Date.now()
+      };
+      this.notifyStatusListeners();
+
+      const result = await discoverLightingDeviceWithDetails({
+        getLastSavedIp: async () => {
+          const cached = await this.loadCachedIp();
+          if (cached) return cached;
+          return isValidIpv4(this.esp32Ip) ? this.esp32Ip : null;
+        },
+        saveLastIp: (ip, port) => this.saveCachedIp(ip, port),
+        getLocalIpv4: () => this.getDeviceLocalIpv4(),
+        fallbackPrefixIp: this.esp32Ip
+      });
+
+      if (result.ip) {
+        this.esp32Ip = result.ip;
+        this.esp32Port = result.port;
+        this.lastDiscoveryFailureTime = 0;
+
+        const methodLabel =
+          result.method === 'CACHE'
+            ? 'cache'
+            : result.method === 'MDNS'
+            ? 'mDNS'
+            : 'varredura da rede';
+
+        this.discoveryStatus = {
+          status: 'CONNECTED',
+          ip: result.ip,
+          port: result.port,
+          method: result.method,
+          message: `G7 Desk F1 encontrado em ${result.ip} via ${methodLabel} (${result.elapsedMs} ms).`,
+          lastAttemptTime: Date.now()
+        };
+        this.notifyStatusListeners();
+        console.log(`[ESP32 Discovery] ${this.discoveryStatus.message}`);
+        return result.ip;
+      }
+
+      this.lastDiscoveryFailureTime = Date.now();
+      this.discoveryStatus = {
+        ...this.discoveryStatus,
+        status: 'NOT_FOUND',
+        method: null,
+        message: 'G7 Desk F1 não encontrado na rede local. Verifique o Wi-Fi ou informe o IP manualmente.',
+        lastAttemptTime: Date.now()
+      };
+      this.notifyStatusListeners();
+      return null;
+    })();
+
+    try {
+      return await this.discoveryPromise;
+    } finally {
+      this.discoveryPromise = null;
+    }
+  }
+
+  /**
+   * Garante conectividade ao iniciar uma sessão/corrida:
+   * testa o IP atual rapidamente (/json/info) e dispara auto-discovery se não responder.
+   */
+  public async ensureConnectedOnSessionStart(): Promise<void> {
+    if (this.discoveryPromise) {
+      await this.discoveryPromise;
+      return;
+    }
+
+    await this.loadCachedIp();
+
+    if (isValidIpv4(this.esp32Ip)) {
+      const info = await probeJsonInfo(this.esp32Ip, CACHE_HEALTH_TIMEOUT_MS);
+      if (info) {
+        const resolvedIp = isValidIpv4(info.ip) ? info.ip.trim() : this.esp32Ip;
+        const port = typeof info.udpport === 'number' ? info.udpport : DEFAULT_ESP32_UDP_PORT;
+        this.esp32Ip = resolvedIp;
+        this.esp32Port = port;
+        if (this.discoveryStatus.status !== 'CONNECTED' || this.discoveryStatus.ip !== resolvedIp) {
+          this.discoveryStatus = {
+            status: 'CONNECTED',
+            ip: resolvedIp,
+            port,
+            method: 'CACHE',
+            message: `G7 Desk F1 ativo em ${resolvedIp}.`,
+            lastAttemptTime: Date.now()
+          };
+          this.notifyStatusListeners();
+        }
+        return;
+      }
+    }
+
+    await this.discoverLightingDevice();
   }
 
   public setTargetIp(ip: string, port: number = DEFAULT_ESP32_UDP_PORT) {
     const cleanIp = ip.trim().split(':')[0];
     if (cleanIp) {
       this.esp32Ip = cleanIp;
+      this.discoveryStatus = {
+        ...this.discoveryStatus,
+        ip: cleanIp,
+        port
+      };
+      this.notifyStatusListeners();
     }
     this.esp32Port = port;
   }
@@ -445,15 +715,13 @@ class Esp32LightingSender {
     setTimeout(() => this.sendUdp(jsonStr, true), 20);
     setTimeout(() => this.sendUdp(jsonStr, true), 50);
 
-    // Testa HTTP apenas quando o botão de teste no menu é clicado
+    // Testa HTTP em /api/effect apenas quando o botão de teste no menu é clicado
     try {
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
 
-      const res = await fetch(`http://${this.esp32Ip}/api/f1-state`, {
+      const res = await fetch(`http://${this.esp32Ip}/api/effect?name=aero`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jsonStr,
         signal: controller ? controller.signal : undefined
       });
 
@@ -462,6 +730,16 @@ class Esp32LightingSender {
       if (res.ok) {
         this.packetsSentCount++;
         this.lastSuccessTime = Date.now();
+        await this.saveCachedIp(this.esp32Ip, this.esp32Port);
+        this.discoveryStatus = {
+          status: 'CONNECTED',
+          ip: this.esp32Ip,
+          port: this.esp32Port,
+          method: this.discoveryStatus.method ?? 'CACHE',
+          message: `Conectado ao ESP32 (${this.esp32Ip})!`,
+          lastAttemptTime: Date.now()
+        };
+        this.notifyStatusListeners();
         return { success: true, message: `Conectado ao ESP32 (${this.esp32Ip})! Efeito Modo Reta ativado nas fitas.` };
       } else {
         return { success: false, message: `ESP32 respondeu com status HTTP ${res.status}.` };
